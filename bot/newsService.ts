@@ -153,25 +153,31 @@ export async function fetchCoinDeskNews(limit: number = 10): Promise<NewsItem[]>
     console.log(`📊 CryptoCompare API Response Headers:`, response.headers);
     console.log(`📊 CryptoCompare API Response Data (first 500 chars):`, JSON.stringify(response.data).substring(0, 500));
     
-    // Handle both possible response structures
+    // Handle response structure - CryptoCompare uses lowercase fields in Data array
     let articles: CryptoCompareArticle[] = [];
     
     if (response.data.Data && Array.isArray(response.data.Data)) {
-      // New structure with uppercase fields
-      articles = response.data.Data;
-      console.log(`✅ Successfully fetched ${articles.length} articles from CryptoCompare (uppercase structure)`);
-    } else if (response.data.data && Array.isArray(response.data.data)) {
-      // Alternative structure with lowercase fields
-      articles = response.data.data.map((item: any) => ({
-        ID: item.id,
-        TITLE: item.title,
-        BODY: item.body,
-        PUBLISHED_ON: item.published_on,
-        URL: item.url,
-        SOURCE_DATA: item.source_data || { name: item.source || 'CryptoCompare' },
-        SENTIMENT: item.sentiment
+      // CryptoCompare structure: response.data.Data contains articles with lowercase fields
+      const rawArticles = response.data.Data;
+      
+      // Convert lowercase fields to uppercase for consistency
+      articles = rawArticles.map((item: any) => ({
+        ID: item.id || item.ID,
+        TITLE: item.title || item.TITLE,
+        BODY: item.body || item.BODY || '',
+        PUBLISHED_ON: item.published_on || item.PUBLISHED_ON,
+        URL: item.url || item.URL,
+        SOURCE_DATA: item.source_data || item.SOURCE_DATA || { name: 'CryptoCompare' },
+        SENTIMENT: item.sentiment || item.SENTIMENT
       }));
-      console.log(`✅ Successfully fetched ${articles.length} articles from CryptoCompare (lowercase structure)`);
+      
+      console.log(`✅ Successfully fetched ${articles.length} articles from CryptoCompare`);
+      console.log(`📊 Sample article fields:`, {
+        id: rawArticles[0]?.id,
+        title: rawArticles[0]?.title?.substring(0, 50) + '...',
+        published_on: rawArticles[0]?.published_on,
+        sentiment: rawArticles[0]?.sentiment
+      });
     } else {
       console.error('❌ CryptoCompare API returned invalid structure:', response.data);
       throw new Error('Invalid response format from CryptoCompare API');
@@ -195,8 +201,31 @@ export async function fetchCoinDeskNews(limit: number = 10): Promise<NewsItem[]>
       const impact = determineImpact(article.TITLE, article.BODY);
       const timestamp = formatTimestamp(article.PUBLISHED_ON);
       
-      // Get source name from SOURCE_DATA if available
-      const sourceName = article.SOURCE_DATA?.name || 'CryptoCompare';
+      // Extract source name from URL or use default
+      let sourceName = 'CryptoCompare';
+      if (article.URL) {
+        try {
+          const urlObj = new URL(article.URL);
+          const hostname = urlObj.hostname.replace('www.', '');
+          
+          // Map common hostnames to readable names
+          const sourceMap: { [key: string]: string } = {
+            'coindesk.com': 'CoinDesk',
+            'cointelegraph.com': 'Cointelegraph',
+            'cryptodaily.co.uk': 'Crypto Daily',
+            'investing.com': 'Investing.com',
+            'coinpaper.com': 'CoinPaper',
+            'decrypt.co': 'Decrypt',
+            'theblock.co': 'The Block',
+            'cryptoslate.com': 'CryptoSlate'
+          };
+          
+          sourceName = sourceMap[hostname] || hostname.split('.')[0].charAt(0).toUpperCase() + hostname.split('.')[0].slice(1);
+        } catch (error) {
+          // If URL parsing fails, try to get from SOURCE_DATA
+          sourceName = article.SOURCE_DATA?.name || 'CryptoCompare';
+        }
+      }
       
       return {
         title: article.TITLE,
