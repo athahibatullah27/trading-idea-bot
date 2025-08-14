@@ -196,6 +196,12 @@ client.on(Events.MessageCreate, async (message) => {
   const content = message.content.toLowerCase();
 
   try {
+    // Hello command for #testing-hub channel
+    if (content === '!hello' && message.channel.name === 'testing-hub') {
+      await message.channel.send('Hello too');
+      return;
+    }
+
     // Trading idea command
     if (content.includes('!tradingidea') || content.includes('!idea') || content.includes('trading idea')) {
       await message.channel.send('🤖 **Analyzing current market conditions...**');
