@@ -12,6 +12,7 @@ import {
 import { TradingRecommendation, CryptoData, NewsItem } from '../src/types/trading.js';
 import { getRealTimeCryptoData, getMultipleCryptoData, testAPIConnection } from './tradingview.js';
 import { generateGeminiRecommendations } from './geminiService.js';
+import { getMarketConditions } from '../src/services/tradingService.js';
 
 // Load environment variables
 dotenv.config();
@@ -145,36 +146,36 @@ client.once(Events.ClientReady, (readyClient) => {
 });
 
 // Helper function to create market overview embed
-function createMarketOverviewEmbed() {
+function createMarketOverviewEmbed(marketConditions = mockMarketConditions) {
   const embed = new EmbedBuilder()
-    .setColor(mockMarketConditions.overall === 'bullish' ? 0x00ff00 : 
-             mockMarketConditions.overall === 'bearish' ? 0xff0000 : 0xffff00)
+    .setColor(marketConditions.overall === 'bullish' ? 0x00ff00 : 
+             marketConditions.overall === 'bearish' ? 0xff0000 : 0xffff00)
     .setTitle('📊 Market Overview')
     .setDescription('Current crypto market conditions')
     .addFields(
       { 
         name: '📈 Market Sentiment', 
-        value: `${mockMarketConditions.overall.toUpperCase()}`, 
+        value: `${marketConditions.overall.toUpperCase()}`, 
         inline: true 
       },
       { 
         name: '⚡ Volatility', 
-        value: `${mockMarketConditions.volatility.toUpperCase()}`, 
+        value: `${marketConditions.volatility.toUpperCase()}`, 
         inline: true 
       },
       { 
         name: '😱 Fear & Greed Index', 
-        value: `${mockMarketConditions.fearGreedIndex}/100`, 
+        value: `${marketConditions.fearGreedIndex}/100`, 
         inline: true 
       },
       { 
         name: '₿ BTC Dominance', 
-        value: `${mockMarketConditions.dominance.btc}%`, 
+        value: `${marketConditions.dominance.btc}%`, 
         inline: true 
       },
       { 
         name: '⟠ ETH Dominance', 
-        value: `${mockMarketConditions.dominance.eth}%`, 
+        value: `${marketConditions.dominance.eth}%`, 
         inline: true 
       }
     )
@@ -320,50 +321,72 @@ client.on(Events.MessageCreate, async (message) => {
     if (content.includes('!tradingidea') || content.includes('!idea') || content.includes('trading idea')) {
       const loadingMsg = await message.channel.send('🤖 **Fetching real-time market data and analyzing conditions...**');
       
-      // Send market overview
-      const marketEmbed = createMarketOverviewEmbed();
-      await message.channel.send({ embeds: [marketEmbed] });
+      let fetchedCryptoData: CryptoData[] = [];
+      let currentMarketConditions = mockMarketConditions;
 
-      // Fetch real-time data for top cryptos
+      // Fetch real-time data for all cryptos needed (BTC, ETH, SOL, ADA) - SINGLE FETCH
       try {
         await loadingMsg.edit('📊 **Analyzing live market data from multiple sources...**');
-        const realTimeData = await getMultipleCryptoData(['BTC', 'ETH', 'SOL']);
+        fetchedCryptoData = await getMultipleCryptoData(['BTC', 'ETH', 'SOL', 'ADA']);
         
-        if (realTimeData.length > 0) {
-          await loadingMsg.edit('✅ **Live market analysis complete!**');
-          await message.channel.send('📊 **Live Technical Analysis:**');
-          
-          for (const crypto of realTimeData.slice(0, 2)) {
-            const cryptoEmbed = createCryptoAnalysisEmbed(crypto);
-            await message.channel.send({ embeds: [cryptoEmbed] });
-          }
+        if (fetchedCryptoData.length > 0) {
+          // Calculate market conditions based on real data
+          currentMarketConditions = await getMarketConditions(fetchedCryptoData);
+          console.log(`📊 Calculated market conditions from ${fetchedCryptoData.length} cryptos:`, currentMarketConditions);
         } else {
-          await loadingMsg.edit('⚠️ **Using cached analysis data due to API limitations.**');
+          console.log('⚠️ No real-time data available, using mock market conditions');
         }
       } catch (error) {
-        console.error('Error fetching real-time data for trading ideas:', error);
-        await loadingMsg.edit('⚠️ **Using cached analysis data due to API limitations.**');
+        console.error('Error fetching real-time data for trading ideas:', error.message);
       }
 
-      // Fetch AI-powered recommendations
+      // Send market overview with real or fallback conditions
+      const marketEmbed = createMarketOverviewEmbed(currentMarketConditions);
+      await message.channel.send({ embeds: [marketEmbed] });
+
+      // Display technical analysis for available cryptos
+      if (fetchedCryptoData.length > 0) {
+        await loadingMsg.edit('✅ **Live market analysis complete!**');
+        await message.channel.send('📊 **Live Technical Analysis:**');
+        
+        for (const crypto of fetchedCryptoData.slice(0, 3)) {
+          const cryptoEmbed = createCryptoAnalysisEmbed(crypto);
+          await message.channel.send({ embeds: [cryptoEmbed] });
+        }
+      } else {
+        await loadingMsg.edit('⚠️ **Using cached analysis data due to API limitations.**');
+        await message.channel.send('📊 **Cached Technical Analysis:**');
+        
+        for (const crypto of mockCryptoData.slice(0, 2)) {
+          const cryptoEmbed = createCryptoAnalysisEmbed(crypto);
+          await message.channel.send({ embeds: [cryptoEmbed] });
+        }
+      }
+
+      // Generate AI-powered recommendations using the SAME data (no additional API calls)
       try {
         await loadingMsg.edit('🤖 **Generating AI-powered trading recommendations...**');
         
-        const response = await axios.get(`http://localhost:${PORT}/api/gemini-recommendations`, {
-          timeout: 30000 // 30 second timeout
-        });
+        // Use the data we already fetched instead of making another API call
+        const dataForGemini = fetchedCryptoData.length > 0 ? fetchedCryptoData : mockCryptoData.slice(0, 4);
         
-        const recommendations: TradingRecommendation[] = response.data;
+        const recommendations = await generateGeminiRecommendations(
+          dataForGemini,
+          mockNews.slice(0, 3), // Include recent news
+          currentMarketConditions   // Use calculated market conditions
+        );
         
         if (recommendations && recommendations.length > 0) {
           await loadingMsg.edit('✅ **AI recommendations ready!**');
           await message.channel.send('🤖 **AI-Powered Trading Recommendations:**');
           
-          // Send top 2 recommendations
-          for (const recommendation of recommendations.slice(0, 2)) {
+          // Send all available recommendations (up to 3)
+          for (const recommendation of recommendations.slice(0, 3)) {
             const recEmbed = createRecommendationEmbed(recommendation);
             await message.channel.send({ embeds: [recEmbed] });
           }
+          
+          console.log(`✅ Successfully displayed ${recommendations.length} AI recommendations in Discord`);
         } else {
           await loadingMsg.edit('⚠️ **AI recommendations currently unavailable.**');
           
@@ -389,7 +412,7 @@ client.on(Events.MessageCreate, async (message) => {
           await message.channel.send({ embeds: [errorEmbed] });
         }
       } catch (error) {
-        console.error('Error fetching Gemini recommendations for Discord:', error);
+        console.error('Error generating Gemini recommendations for Discord:', error.message);
         await loadingMsg.edit('❌ **Failed to generate AI recommendations.**');
         
         const errorEmbed = new EmbedBuilder()
@@ -399,7 +422,7 @@ client.on(Events.MessageCreate, async (message) => {
           .addFields(
             { 
               name: 'Error Details:', 
-              value: 'AI analysis service is temporarily unavailable.', 
+              value: `AI analysis encountered an error: ${error.message || 'Unknown error'}`, 
               inline: false 
             },
             { 
