@@ -14,6 +14,7 @@ import { TradingRecommendation, CryptoData, NewsItem } from '../src/types/tradin
 import { getRealTimeCryptoData, getMultipleCryptoData, testAPIConnection } from './tradingview.js';
 import { generateGeminiRecommendations } from './geminiService.js';
 import { getMarketConditions } from '../src/services/tradingService.js';
+import { commands } from './commands.js';
 
 // Load environment variables
 dotenv.config();
