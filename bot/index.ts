@@ -188,6 +188,177 @@ async function registerSlashCommands() {
   }
 }
 
+// Handle slash command interactions
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+
+  // Acknowledge the interaction immediately to prevent timeout
+  await interaction.deferReply();
+
+  try {
+    if (interaction.commandName === 'tradingidea') {
+      // Show initial loading message
+      await interaction.editReply('🔄 **Generating AI-powered trading recommendations...**\n*This may take a moment while I analyze the markets*');
+      
+      try {
+        // Fetch recommendations from our API
+        const response = await axios.get('http://localhost:3001/api/gemini-recommendations', {
+          timeout: 30000 // 30 second timeout
+        });
+        
+        const recommendations = response.data;
+        
+        if (!recommendations || recommendations.length === 0) {
+          await interaction.editReply('❌ **No trading recommendations available at the moment.**\n*Please try again in a few minutes.*');
+          return;
+        }
+        
+        // Update with success message
+        await interaction.editReply(`✅ **Generated ${recommendations.length} AI trading recommendations!**`);
+        
+        // Send each recommendation as a separate embed
+        for (const recommendation of recommendations) {
+          const embed = createRecommendationEmbed(recommendation);
+          await interaction.followUp({ embeds: [embed] });
+        }
+        
+      } catch (apiError: any) {
+        console.error('API Error:', apiError.message);
+        
+        // Check if it's a user-friendly error from our API
+        if (apiError.response?.data?.userMessage) {
+          await interaction.editReply(`❌ **${apiError.response.data.userMessage}**`);
+        } else {
+          await interaction.editReply('❌ **Unable to generate recommendations at the moment.**\n*Our AI analysis service may be experiencing high demand. Please try again in a few minutes.*');
+        }
+      }
+      return;
+    }
+    
+    if (interaction.commandName === 'market') {
+      const marketEmbed = createMarketOverviewEmbed();
+      await interaction.editReply({ content: '', embeds: [marketEmbed] });
+      return;
+    }
+    
+    if (interaction.commandName === 'crypto') {
+      const symbol = interaction.options.getString('symbol')?.toUpperCase();
+      if (!symbol) {
+        await interaction.editReply('❌ Please provide a valid cryptocurrency symbol.');
+        return;
+      }
+      
+      // Show loading message
+      await interaction.editReply(`🔄 **Fetching live ${symbol} data...**`);
+      
+      try {
+        const realTimeCrypto = await getRealTimeCryptoData(symbol);
+        
+        if (realTimeCrypto && realTimeCrypto.price > 0) {
+          await interaction.editReply(`✅ **Live ${symbol} analysis ready!**`);
+          const cryptoEmbed = createCryptoAnalysisEmbed(realTimeCrypto);
+          await interaction.followUp({ content: '', embeds: [cryptoEmbed] });
+        } else {
+          throw new Error('No real-time data available');
+        }
+      } catch (error) {
+        console.error(`Error fetching real-time data for ${symbol}:`, error);
+        
+        // Fallback to mock data
+        const crypto = mockCryptoData.find(c => c.symbol === symbol);
+        if (crypto) {
+          await interaction.editReply(`⚠️ **Using cached ${symbol} data due to API limitations.**`);
+          const cryptoEmbed = createCryptoAnalysisEmbed(crypto);
+          await interaction.followUp({ content: '', embeds: [cryptoEmbed] });
+        } else {
+          await interaction.editReply(`❌ **Sorry, I don't have data for ${symbol} yet.**`);
+        }
+      }
+      return;
+    }
+    
+    if (interaction.commandName === 'price') {
+      const symbol = interaction.options.getString('symbol')?.toUpperCase();
+      if (!symbol) {
+        await interaction.editReply('❌ Please provide a valid cryptocurrency symbol.');
+        return;
+      }
+      
+      await interaction.editReply(`💰 **Getting ${symbol} price...**`);
+      
+      try {
+        const crypto = await getRealTimeCryptoData(symbol);
+        if (crypto && crypto.price > 0) {
+          const changeEmoji = crypto.change24h > 0 ? '📈' : '📉';
+          const changeColor = crypto.change24h > 0 ? '🟢' : '🔴';
+          
+          await interaction.editReply(
+            `💰 **${crypto.name} (${symbol})**\n` +
+            `**Price:** $${crypto.price.toLocaleString()}\n` +
+            `**24h Change:** ${changeColor} ${crypto.change24h > 0 ? '+' : ''}${crypto.change24h.toFixed(2)}% ${changeEmoji}`
+          );
+        } else {
+          throw new Error('No price data available');
+        }
+      } catch (error) {
+        await interaction.editReply(`❌ **Could not fetch ${symbol} price. Please try again later.**`);
+      }
+      return;
+    }
+    
+    if (interaction.commandName === 'news') {
+      const newsEmbed = createNewsEmbed();
+      await interaction.editReply({ content: '', embeds: [newsEmbed] });
+      return;
+    }
+    
+    if (interaction.commandName === 'test') {
+      await interaction.editReply('🧪 **Testing API connections...**');
+      
+      const isWorking = await testAPIConnection();
+      if (isWorking) {
+        await interaction.editReply('✅ **API connections are working! Real-time data is available.**');
+      } else {
+        await interaction.editReply('❌ **API connections failed. Using cached data as fallback.**');
+      }
+      return;
+    }
+    
+    if (interaction.commandName === 'help') {
+      const helpEmbed = new EmbedBuilder()
+        .setColor(0x3b82f6)
+        .setTitle('🤖 CryptoTrader Bot Commands')
+        .setDescription('Available slash commands for crypto trading analysis')
+        .addFields(
+          { name: '/tradingidea', value: 'Get AI-powered trading recommendations', inline: false },
+          { name: '/market', value: 'View current market overview', inline: false },
+          { name: '/crypto [symbol]', value: 'Get technical analysis for specific crypto', inline: false },
+          { name: '/price [symbol]', value: 'Get quick price for any crypto', inline: false },
+          { name: '/news', value: 'Latest crypto news with sentiment analysis', inline: false },
+          { name: '/test', value: 'Test API connectivity', inline: false },
+          { name: '/help', value: 'Show this help message', inline: false }
+        )
+        .setTimestamp()
+        .setFooter({ text: 'CryptoTrader Bot • AI-Powered Trading Analysis' });
+
+      await interaction.editReply({ content: '', embeds: [helpEmbed] });
+      return;
+    }
+    
+  } catch (error) {
+    console.error('Error handling slash command:', error);
+    try {
+      if (interaction.deferred) {
+        await interaction.editReply('❌ Sorry, I encountered an error processing your request. Please try again.');
+      } else {
+        await interaction.reply('❌ Sorry, I encountered an error processing your request. Please try again.');
+      }
+    } catch (replyError) {
+      console.error('Error sending error message:', replyError);
+    }
+  }
+});
+
 // Helper function to create market overview embed
 function createMarketOverviewEmbed(marketConditions = mockMarketConditions) {
   const embed = new EmbedBuilder()
