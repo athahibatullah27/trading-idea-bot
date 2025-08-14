@@ -90,14 +90,14 @@ app.get('/api/gemini-recommendations', async (req, res) => {
     }
     
     // Fetch real-time news from CoinDesk
-    console.log('📰 Fetching real-time news from CoinDesk...');
+    console.log('📰 Fetching real-time news from CryptoCompare...');
     const realTimeNews = await fetchCoinDeskNews(5);
     const newsToUse = realTimeNews.length > 0 ? realTimeNews : mockNews.slice(0, 3);
     
     if (realTimeNews.length > 0) {
-      console.log(`✅ Using ${realTimeNews.length} real-time news articles from CoinDesk`);
+      console.log(`✅ Using ${realTimeNews.length} real-time news articles from CryptoCompare`);
     } else {
-      console.log('⚠️ CoinDesk API unavailable, using fallback mock news');
+      console.log('⚠️ CryptoCompare API unavailable, using fallback mock news');
     }
     
     // Generate recommendations using Gemini
@@ -161,9 +161,9 @@ client.once(Events.ClientReady, (readyClient) => {
   // Test CoinDesk News API on startup
   testCoinDeskAPI().then(isConnected => {
     if (isConnected) {
-      console.log('📰 CoinDesk News API is working');
+      console.log('📰 CryptoCompare News API is working');
     } else {
-      console.log('⚠️ CoinDesk News API is not available, using fallback news');
+      console.log('⚠️ CryptoCompare News API is not available, using fallback news');
     }
   });
   

@@ -27,8 +27,8 @@ interface CoinDeskResponse {
 }
 
 // Function to analyze sentiment from title and summary
-function analyzeSentiment(title: string, summary?: string): 'bullish' | 'bearish' | 'neutral' {
-  const text = `${title} ${summary || ''}`.toLowerCase();
+function analyzeSentiment(title: string, body?: string): 'bullish' | 'bearish' | 'neutral' {
+  const text = `${title} ${body || ''}`.toLowerCase();
   
   // Bullish keywords
   const bullishKeywords = [
@@ -93,8 +93,8 @@ function determineImpact(title: string, summary?: string): 'high' | 'medium' | '
 }
 
 // Function to format timestamp
-function formatTimestamp(publishedAt: string): string {
-  const publishedDate = new Date(publishedAt);
+function formatTimestamp(publishedOn: number): string {
+  const publishedDate = new Date(publishedOn * 1000); // Convert Unix timestamp to milliseconds
   const now = new Date();
   const diffMs = now.getTime() - publishedDate.getTime();
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
@@ -195,9 +195,9 @@ export async function fetchCoinDeskNews(limit: number = 10): Promise<NewsItem[]>
 // Function to test CoinDesk API connectivity
 export async function testCoinDeskAPI(): Promise<boolean> {
   try {
-    console.log('🧪 Testing CoinDesk API connectivity...');
-    const testUrl = `${COINDESK_API_BASE}/news/v1/article/list?limit=1`;
-    console.log(`🌐 Testing CoinDesk URL: ${testUrl}`);
+    console.log('🧪 Testing CryptoCompare News API connectivity...');
+    const testUrl = `${COINDESK_API_BASE}/news/?lang=EN&sortOrder=latest&limit=1`;
+    console.log(`🌐 Testing CryptoCompare URL: ${testUrl}`);
     
     const response = await axios.get(
       testUrl,
@@ -211,20 +211,20 @@ export async function testCoinDeskAPI(): Promise<boolean> {
       }
     );
     
-    console.log(`📊 CoinDesk Test Response Status: ${response.status}`);
-    console.log(`📊 CoinDesk Test Response Data:`, JSON.stringify(response.data).substring(0, 200));
+    console.log(`📊 CryptoCompare Test Response Status: ${response.status}`);
+    console.log(`📊 CryptoCompare Test Response Data:`, JSON.stringify(response.data).substring(0, 200));
     
-    if (response.status === 200 && response.data && response.data.data) {
-      console.log('✅ CoinDesk API test successful');
+    if (response.status === 200 && response.data && response.data.Data) {
+      console.log('✅ CryptoCompare News API test successful');
       return true;
     }
     
-    console.log('❌ CoinDesk API test failed - invalid response structure');
-    console.log('📄 Expected: response.data.data, Got:', typeof response.data, Object.keys(response.data || {}));
+    console.log('❌ CryptoCompare API test failed - invalid response structure');
+    console.log('📄 Expected: response.data.Data, Got:', typeof response.data, Object.keys(response.data || {}));
     return false;
     
   } catch (error) {
-    console.error('❌ CoinDesk API test failed:', error.message);
+    console.error('❌ CryptoCompare API test failed:', error.message);
     
     if (error.response) {
       console.error('📄 Test response error:', {
