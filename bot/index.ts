@@ -2,10 +2,10 @@ import { Client, GatewayIntentBits, Events, EmbedBuilder, SlashCommandBuilder } 
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import axios from 'axios';
 import { 
   mockCryptoData, 
   mockNews, 
-  mockRecommendations, 
   mockMarketConditions,
   mockGeopoliticalFactors 
 } from '../src/data/mockData.js';
@@ -345,10 +345,73 @@ client.on(Events.MessageCreate, async (message) => {
         await loadingMsg.edit('⚠️ **Using cached analysis data due to API limitations.**');
       }
 
-      // Send top recommendations
-      for (const recommendation of mockRecommendations.slice(0, 2)) {
-        const recEmbed = createRecommendationEmbed(recommendation);
-        await message.channel.send({ embeds: [recEmbed] });
+      // Fetch AI-powered recommendations
+      try {
+        await loadingMsg.edit('🤖 **Generating AI-powered trading recommendations...**');
+        
+        const response = await axios.get(`http://localhost:${PORT}/api/gemini-recommendations`, {
+          timeout: 30000 // 30 second timeout
+        });
+        
+        const recommendations: TradingRecommendation[] = response.data;
+        
+        if (recommendations && recommendations.length > 0) {
+          await loadingMsg.edit('✅ **AI recommendations ready!**');
+          await message.channel.send('🤖 **AI-Powered Trading Recommendations:**');
+          
+          // Send top 2 recommendations
+          for (const recommendation of recommendations.slice(0, 2)) {
+            const recEmbed = createRecommendationEmbed(recommendation);
+            await message.channel.send({ embeds: [recEmbed] });
+          }
+        } else {
+          await loadingMsg.edit('⚠️ **AI recommendations currently unavailable.**');
+          
+          const errorEmbed = new EmbedBuilder()
+            .setColor(0xffa500)
+            .setTitle('⚠️ AI Analysis Unavailable')
+            .setDescription('Our AI trading analysis is currently unavailable.')
+            .addFields(
+              { 
+                name: 'Possible Reasons:', 
+                value: '• High demand on AI services\n• Temporary maintenance\n• Market data connectivity issues', 
+                inline: false 
+              },
+              { 
+                name: '💡 What to do:', 
+                value: 'Please try the `!tradingidea` command again in a few minutes.', 
+                inline: false 
+              }
+            )
+            .setTimestamp()
+            .setFooter({ text: 'CryptoTrader Bot • AI Service Status' });
+          
+          await message.channel.send({ embeds: [errorEmbed] });
+        }
+      } catch (error) {
+        console.error('Error fetching Gemini recommendations for Discord:', error);
+        await loadingMsg.edit('❌ **Failed to generate AI recommendations.**');
+        
+        const errorEmbed = new EmbedBuilder()
+          .setColor(0xff0000)
+          .setTitle('❌ AI Service Error')
+          .setDescription('We encountered an issue while generating trading recommendations.')
+          .addFields(
+            { 
+              name: 'Error Details:', 
+              value: 'AI analysis service is temporarily unavailable.', 
+              inline: false 
+            },
+            { 
+              name: '🔄 Try Again:', 
+              value: 'Please wait a few minutes and use `!tradingidea` again.', 
+              inline: false 
+            }
+          )
+          .setTimestamp()
+          .setFooter({ text: 'CryptoTrader Bot • Error Report' });
+        
+        await message.channel.send({ embeds: [errorEmbed] });
       }
 
       return;
