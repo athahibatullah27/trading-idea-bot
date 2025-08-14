@@ -134,10 +134,10 @@ export async function fetchCoinDeskNews(limit: number = 10): Promise<NewsItem[]>
   try {
     console.log(`📰 Fetching ${limit} latest news articles from CoinDesk API...`);
     
-    const url = `${COINDESK_API_BASE}/news/v1/article/list?limit=${limit}`;
+    const url = `${CRYPTOCOMPARE_API_BASE}/data/v2/news/?lang=EN&sortOrder=latest&limit=${limit}`;
     console.log(`🌐 CoinDesk API URL: ${url}`);
     
-    const response = await axios.get<CoinDeskResponse>(
+    const response = await axios.get<CryptoCompareResponse>(
       url,
       {
         headers: {
@@ -153,24 +153,35 @@ export async function fetchCoinDeskNews(limit: number = 10): Promise<NewsItem[]>
     console.log(`📊 CoinDesk API Response Headers:`, response.headers);
     console.log(`📊 CoinDesk API Response Data (first 500 chars):`, JSON.stringify(response.data).substring(0, 500));
     
-    if (!response.data || !response.data.data) {
+    if (!response.data || !response.data.Data) {
       console.error('❌ CoinDesk API returned invalid structure:', response.data);
-      throw new Error('Invalid response format from CoinDesk API');
+      throw new Error('Invalid response format from CryptoCompare API');
     }
     
-    const articles = response.data.data;
-    console.log(`✅ Successfully fetched ${articles.length} articles from CoinDesk`);
+    const articles = response.data.Data;
+    console.log(`✅ Successfully fetched ${articles.length} articles from CryptoCompare`);
     
-    // Convert CoinDesk articles to our NewsItem format
-    const newsItems: NewsItem[] = articles.map((article: CoinDeskArticle) => {
-      const sentiment = analyzeSentiment(article.title, article.summary);
-      const impact = determineImpact(article.title, article.summary);
-      const timestamp = formatTimestamp(article.published_at);
+    // Convert CryptoCompare articles to our NewsItem format
+    const newsItems: NewsItem[] = articles.map((article: CryptoCompareArticle) => {
+      // Use CryptoCompare's built-in sentiment if available, otherwise analyze
+      let sentiment: 'bullish' | 'bearish' | 'neutral' = 'neutral';
+      if (article.SENTIMENT) {
+        sentiment = article.SENTIMENT.toLowerCase() === 'positive' ? 'bullish' :
+                   article.SENTIMENT.toLowerCase() === 'negative' ? 'bearish' : 'neutral';
+      } else {
+        sentiment = analyzeSentiment(article.TITLE, article.BODY);
+      }
+      
+      const impact = determineImpact(article.TITLE, article.BODY);
+      const timestamp = formatTimestamp(article.PUBLISHED_ON);
+      
+      // Get source name from SOURCE_DATA if available
+      const sourceName = article.SOURCE_DATA?.name || 'CryptoCompare';
       
       return {
-        title: article.title,
+        title: article.TITLE,
         sentiment: sentiment,
-        source: 'CoinDesk',
+        source: sourceName,
         timestamp: timestamp,
         impact: impact
       };
@@ -185,23 +196,23 @@ export async function fetchCoinDeskNews(limit: number = 10): Promise<NewsItem[]>
     return newsItems;
     
   } catch (error) {
-    console.error('❌ Error fetching news from CoinDesk API:', error.message);
+    console.error('❌ Error fetching news from CryptoCompare API:', error.message);
     
     if (error.response) {
-      console.error('📄 CoinDesk API response:', {
+      console.error('📄 CryptoCompare API response:', {
         status: error.response.status,
         statusText: error.response.statusText,
         headers: error.response.headers,
         data: JSON.stringify(error.response.data).substring(0, 1000)
       });
     } else if (error.request) {
-      console.error('📄 CoinDesk API request failed:', {
+      console.error('📄 CryptoCompare API request failed:', {
         url: error.config?.url,
         method: error.config?.method,
         timeout: error.config?.timeout
       });
     } else {
-      console.error('📄 CoinDesk API error details:', error);
+      console.error('📄 CryptoCompare API error details:', error);
     }
     
     // Return empty array on error - calling code can handle fallback
