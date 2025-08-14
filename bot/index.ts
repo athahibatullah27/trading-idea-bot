@@ -328,8 +328,31 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
     
     if (interaction.commandName === 'news') {
-      const newsEmbed = createNewsEmbed();
-      await interaction.editReply({ content: '', embeds: [newsEmbed] });
+      try {
+        // Show loading message
+        await interaction.editReply('📰 **Fetching latest crypto news...**');
+        
+        // Fetch real-time news from CryptoCompare
+        console.log('📰 Slash command: Fetching real-time news from CryptoCompare...');
+        const realTimeNews = await fetchCoinDeskNews(5);
+        
+        if (realTimeNews.length > 0) {
+          console.log(`✅ Slash command: Successfully fetched ${realTimeNews.length} real-time news articles`);
+          await interaction.editReply(`✅ **Found ${realTimeNews.length} latest crypto news articles!**`);
+          const newsEmbed = createNewsEmbed(realTimeNews);
+          await interaction.followUp({ content: '', embeds: [newsEmbed] });
+        } else {
+          console.log('⚠️ Slash command: CryptoCompare API returned no articles, using fallback');
+          await interaction.editReply('⚠️ **Using cached news due to API limitations.**');
+          const newsEmbed = createNewsEmbed();
+          await interaction.followUp({ content: '', embeds: [newsEmbed] });
+        }
+      } catch (error) {
+        console.error('❌ Slash command: Error fetching real-time news:', error);
+        await interaction.editReply('⚠️ **Using cached news due to API error.**');
+        const newsEmbed = createNewsEmbed();
+        await interaction.followUp({ content: '', embeds: [newsEmbed] });
+      }
       return;
     }
     
