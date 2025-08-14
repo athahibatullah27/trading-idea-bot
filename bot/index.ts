@@ -15,6 +15,7 @@ import { getRealTimeCryptoData, getMultipleCryptoData, testAPIConnection } from 
 import { generateGeminiRecommendations } from './geminiService.js';
 import { getMarketConditions } from '../src/services/tradingService.js';
 import { commands } from './commands.js';
+import { fetchCoinDeskNews, testCoinDeskAPI } from './newsService.js';
 
 // Load environment variables
 dotenv.config();
@@ -88,10 +89,21 @@ app.get('/api/gemini-recommendations', async (req, res) => {
       });
     }
     
+    // Fetch real-time news from CoinDesk
+    console.log('📰 Fetching real-time news from CoinDesk...');
+    const realTimeNews = await fetchCoinDeskNews(5);
+    const newsToUse = realTimeNews.length > 0 ? realTimeNews : mockNews.slice(0, 3);
+    
+    if (realTimeNews.length > 0) {
+      console.log(`✅ Using ${realTimeNews.length} real-time news articles from CoinDesk`);
+    } else {
+      console.log('⚠️ CoinDesk API unavailable, using fallback mock news');
+    }
+    
     // Generate recommendations using Gemini
     const recommendations = await generateGeminiRecommendations(
       cryptoData,
-      mockNews.slice(0, 3), // Include recent news
+      newsToUse, // Include real-time or fallback news
       mockMarketConditions   // Include market conditions
     );
     
@@ -143,6 +155,15 @@ client.once(Events.ClientReady, (readyClient) => {
       console.log('🌐 Real-time data APIs are working');
     } else {
       console.log('⚠️ Real-time data APIs are not available, using fallback data');
+    }
+  });
+  
+  // Test CoinDesk News API on startup
+  testCoinDeskAPI().then(isConnected => {
+    if (isConnected) {
+      console.log('📰 CoinDesk News API is working');
+    } else {
+      console.log('⚠️ CoinDesk News API is not available, using fallback news');
     }
   });
   

@@ -180,8 +180,83 @@ export async function getGeminiRecommendationsFromAPI(): Promise<TradingRecommen
   }
 }
 
-// Function to get real-time news (mock for now, can be replaced with real news API)
+// Function to get real-time news via proxy
 export async function getRealTimeNews(): Promise<NewsItem[]> {
+  try {
+    console.log('📰 Frontend: Fetching real-time news via proxy...');
+    
+    const response = await fetch(`${API_PROXY_BASE}/news?limit=5`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal: AbortSignal.timeout(10000) // 10 second timeout
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const news = await response.json();
+    console.log(`✅ Frontend: Successfully fetched ${news.length} real-time news articles`);
+    
+    return news;
+    
+  } catch (error) {
+    console.error('❌ Frontend: Error fetching real-time news via proxy:', error.message);
+    
+    // Fallback to mock news with current timestamps
+    console.log('📦 Frontend: Using fallback mock news');
+    return getMockNewsWithTimestamps();
+  }
+}
+
+// Helper function to get mock news with current timestamps
+function getMockNewsWithTimestamps(): NewsItem[] {
+  const now = new Date();
+  const mockNews: NewsItem[] = [
+    {
+      title: "Bitcoin ETF sees record institutional inflows",
+      sentiment: 'bullish',
+      source: 'CoinDesk',
+      timestamp: `${Math.floor(Math.random() * 4) + 1} hours ago`,
+      impact: 'high'
+    },
+    {
+      title: "Federal Reserve signals potential rate adjustments",
+      sentiment: 'bullish',
+      source: 'Reuters',
+      timestamp: `${Math.floor(Math.random() * 6) + 2} hours ago`,
+      impact: 'medium'
+    },
+    {
+      title: "Ethereum network upgrade shows promising results",
+      sentiment: 'bullish',
+      source: 'CryptoSlate',
+      timestamp: `${Math.floor(Math.random() * 8) + 4} hours ago`,
+      impact: 'medium'
+    },
+    {
+      title: "Major exchange reports security improvements",
+      sentiment: 'neutral',
+      source: 'BlockBeats',
+      timestamp: `${Math.floor(Math.random() * 12) + 6} hours ago`,
+      impact: 'low'
+    },
+    {
+      title: "Solana ecosystem continues rapid expansion",
+      sentiment: 'bullish',
+      source: 'The Block',
+      timestamp: `${Math.floor(Math.random() * 16) + 8} hours ago`,
+      impact: 'medium'
+    }
+  ];
+
+  return mockNews;
+}
+
+// Function to get real-time news (mock for now, can be replaced with real news API)
+export async function getRealTimeNewsOld(): Promise<NewsItem[]> {
   // This would typically fetch from a real news API
   // For now, returning mock data with timestamps that reflect current time
   const now = new Date();
