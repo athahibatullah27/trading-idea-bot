@@ -196,7 +196,7 @@ export async function fetchCoinDeskNews(limit: number = 10): Promise<NewsItem[]>
 export async function testCoinDeskAPI(): Promise<boolean> {
   try {
     console.log('🧪 Testing CryptoCompare News API connectivity...');
-    const testUrl = `${COINDESK_API_BASE}/news/?lang=EN&sortOrder=latest&limit=1`;
+    const testUrl = `https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=latest&limit=1`;
     console.log(`🌐 Testing CryptoCompare URL: ${testUrl}`);
     
     const response = await axios.get(
@@ -214,7 +214,7 @@ export async function testCoinDeskAPI(): Promise<boolean> {
     console.log(`📊 CryptoCompare Test Response Status: ${response.status}`);
     console.log(`📊 CryptoCompare Test Response Data:`, JSON.stringify(response.data).substring(0, 200));
     
-    if (response.status === 200 && response.data && response.data.Data) {
+    if (response.status === 200 && response.data && response.data.Data && Array.isArray(response.data.Data)) {
       console.log('✅ CryptoCompare News API test successful');
       return true;
     }
