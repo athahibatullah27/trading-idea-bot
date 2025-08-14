@@ -1,4 +1,5 @@
 import { Client, GatewayIntentBits, Events, EmbedBuilder, SlashCommandBuilder } from 'discord.js';
+import { REST, Routes } from 'discord.js';
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
