@@ -5,36 +5,23 @@ import { CryptoCard } from './components/CryptoCard';
 import { TradingRecommendation } from './components/TradingRecommendation';
 import { NewsItem } from './components/NewsItem';
 import { GeopoliticalFactors } from './components/GeopoliticalFactors';
-import { 
-  mockCryptoData, 
-  mockNews, 
-  mockRecommendations, 
-  mockMarketConditions,
-  mockGeopoliticalFactors 
-} from './data/mockData';
+import { ConnectionStatus } from './components/ConnectionStatus';
+import { useRealTimeData } from './hooks/useRealTimeData';
 import { RefreshCw, MessageCircle, Zap } from 'lucide-react';
 
 function App() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState(new Date());
-
-  const handleRefresh = () => {
-    setIsLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
-      setLastUpdate(new Date());
-    }, 2000);
-  };
-
-  useEffect(() => {
-    // Auto-refresh every 5 minutes
-    const interval = setInterval(() => {
-      setLastUpdate(new Date());
-    }, 300000);
-
-    return () => clearInterval(interval);
-  }, []);
+  const {
+    cryptoData,
+    news,
+    recommendations,
+    marketConditions,
+    geopoliticalFactors,
+    isLoading,
+    isApiConnected,
+    lastUpdate,
+    refreshData,
+    testConnection
+  } = useRealTimeData();
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -50,7 +37,7 @@ function App() {
           
           <div className="flex items-center space-x-3">
             <button 
-              onClick={handleRefresh}
+              onClick={refreshData}
               disabled={isLoading}
               className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg transition-colors"
             >
@@ -66,7 +53,16 @@ function App() {
         </div>
 
         {/* Market Overview */}
-        <MarketOverview conditions={mockMarketConditions} />
+        <MarketOverview conditions={marketConditions} />
+
+        {/* Connection Status */}
+        <ConnectionStatus 
+          isConnected={isApiConnected}
+          isLoading={isLoading}
+          lastUpdate={lastUpdate}
+          onRefresh={refreshData}
+          onTest={testConnection}
+        />
 
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -79,9 +75,17 @@ function App() {
                 <h3 className="text-xl font-semibold text-white">Market Analysis</h3>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {mockCryptoData.map((crypto) => (
+                {cryptoData.length > 0 ? cryptoData.map((crypto) => (
                   <CryptoCard key={crypto.symbol} crypto={crypto} />
-                ))}
+                )) : (
+                  <div className="col-span-2 bg-gray-800 rounded-lg p-8 border border-gray-700 text-center">
+                    <div className="text-gray-400 mb-2">
+                      <RefreshCw className="w-8 h-8 mx-auto mb-2 animate-spin" />
+                    </div>
+                    <p className="text-gray-300">Loading real-time crypto data...</p>
+                    <p className="text-gray-500 text-sm mt-1">This may take a few moments</p>
+                  </div>
+                )}
               </div>
             </section>
 
@@ -89,7 +93,7 @@ function App() {
             <section>
               <h3 className="text-xl font-semibold text-white mb-4">Market News & Sentiment</h3>
               <div className="space-y-3">
-                {mockNews.map((news, index) => (
+                {news.map((news, index) => (
                   <NewsItem key={index} news={news} />
                 ))}
               </div>
@@ -102,29 +106,41 @@ function App() {
             <section>
               <h3 className="text-xl font-semibold text-white mb-4">AI Recommendations</h3>
               <div className="space-y-4">
-                {mockRecommendations.map((recommendation, index) => (
+                {recommendations.length > 0 ? recommendations.map((recommendation, index) => (
                   <TradingRecommendation key={index} recommendation={recommendation} />
-                ))}
+                )) : (
+                  <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 text-center">
+                    <div className="text-gray-400 mb-2">
+                      <RefreshCw className="w-6 h-6 mx-auto mb-2 animate-spin" />
+                    </div>
+                    <p className="text-gray-300">Generating AI recommendations...</p>
+                    <p className="text-gray-500 text-sm mt-1">Based on real-time market data</p>
+                  </div>
+                )}
               </div>
             </section>
 
             {/* Geopolitical Factors */}
-            <GeopoliticalFactors factors={mockGeopoliticalFactors} />
+            <GeopoliticalFactors factors={geopoliticalFactors} />
           </div>
         </div>
 
-        {/* Bot Status Bar */}
-        <div className="mt-8 bg-gray-800 rounded-lg p-4 border border-gray-700">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-              <span className="text-white font-medium">Bot Status: Active</span>
-              <span className="text-gray-400 text-sm">
-                Last analysis: {lastUpdate.toLocaleTimeString()}
-              </span>
-            </div>
-            <div className="text-sm text-gray-400">
-              Next update in: 4m 23s
+        {/* Real-time Status */}
+        <div className="mt-8">
+          <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className={`w-3 h-3 rounded-full ${isApiConnected ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`}></div>
+                <span className="text-white font-medium">
+                  System Status: {isApiConnected ? 'Live Data Active' : 'Cached Data Mode'}
+                </span>
+                <span className="text-gray-400 text-sm">
+                  Last update: {lastUpdate.toLocaleTimeString()}
+                </span>
+              </div>
+              <div className="text-sm text-gray-400">
+                {isApiConnected ? 'Real-time analysis running' : 'Limited functionality'}
+              </div>
             </div>
           </div>
         </div>

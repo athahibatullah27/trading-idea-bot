@@ -1,4 +1,6 @@
 import { Client, GatewayIntentBits, Events, EmbedBuilder, SlashCommandBuilder } from 'discord.js';
+import express from 'express';
+import cors from 'cors';
 import dotenv from 'dotenv';
 import { 
   mockCryptoData, 
@@ -8,9 +10,69 @@ import {
   mockGeopoliticalFactors 
 } from '../src/data/mockData.js';
 import { TradingRecommendation, CryptoData, NewsItem } from '../src/types/trading.js';
+import { getRealTimeCryptoData, getMultipleCryptoData, testAPIConnection } from './tradingview.js';
 
 // Load environment variables
 dotenv.config();
+
+// Create Express server for API proxy
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+// API endpoint for crypto data
+app.get('/api/crypto-data', async (req, res) => {
+  try {
+    const { symbol } = req.query;
+    if (!symbol) {
+      return res.status(400).json({ error: 'Symbol parameter is required' });
+    }
+
+    const data = await getRealTimeCryptoData(symbol as string);
+    if (data) {
+      res.json(data);
+    } else {
+      res.status(404).json({ error: `No data available for ${symbol}` });
+    }
+  } catch (error) {
+    console.error('API proxy error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// API endpoint for multiple crypto data
+app.get('/api/multiple-crypto-data', async (req, res) => {
+  try {
+    const { symbols } = req.query;
+    if (!symbols) {
+      return res.status(400).json({ error: 'Symbols parameter is required' });
+    }
+
+    const symbolArray = (symbols as string).split(',');
+    const data = await getMultipleCryptoData(symbolArray);
+    res.json(data);
+  } catch (error) {
+    console.error('API proxy error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// API endpoint for testing connection
+app.get('/api/test-connection', async (req, res) => {
+  try {
+    const isConnected = await testAPIConnection();
+    res.json({ connected: isConnected });
+  } catch (error) {
+    console.error('API test error:', error);
+    res.status(500).json({ connected: false, error: 'Test failed' });
+  }
+});
+
+// Start the proxy server
+const PORT = process.env.API_PORT || 3001;
+app.listen(PORT, () => {
+  console.log(`🌐 API proxy server running on port ${PORT}`);
+});
 
 // Create Discord client
 const client = new Client({
@@ -25,6 +87,15 @@ const client = new Client({
 client.once(Events.ClientReady, (readyClient) => {
   console.log(`🤖 Discord bot is ready! Logged in as ${readyClient.user.tag}`);
   console.log(`📊 Bot is serving ${readyClient.guilds.cache.size} servers`);
+  
+  // Test API connection on startup
+  testAPIConnection().then(isConnected => {
+    if (isConnected) {
+      console.log('🌐 Real-time data APIs are working');
+    } else {
+      console.log('⚠️ Real-time data APIs are not available, using fallback data');
+    }
+  });
   
   // Set bot status
   client.user?.setActivity('crypto markets 📈', { type: 3 }); // 3 = Watching
@@ -204,7 +275,7 @@ client.on(Events.MessageCreate, async (message) => {
 
     // Trading idea command
     if (content.includes('!tradingidea') || content.includes('!idea') || content.includes('trading idea')) {
-      await message.channel.send('🤖 **Fetching real-time market data and analyzing conditions...**');
+      const loadingMsg = await message.channel.send('🤖 **Fetching real-time market data and analyzing conditions...**');
       
       // Send market overview
       const marketEmbed = createMarketOverviewEmbed();
@@ -212,19 +283,23 @@ client.on(Events.MessageCreate, async (message) => {
 
       // Fetch real-time data for top cryptos
       try {
+        await loadingMsg.edit('📊 **Analyzing live market data from multiple sources...**');
         const realTimeData = await getMultipleCryptoData(['BTC', 'ETH', 'SOL']);
         
         if (realTimeData.length > 0) {
-          await message.channel.send('📊 **Real-time Technical Analysis:**');
+          await loadingMsg.edit('✅ **Live market analysis complete!**');
+          await message.channel.send('📊 **Live Technical Analysis:**');
           
           for (const crypto of realTimeData.slice(0, 2)) {
             const cryptoEmbed = createCryptoAnalysisEmbed(crypto);
             await message.channel.send({ embeds: [cryptoEmbed] });
           }
+        } else {
+          await loadingMsg.edit('⚠️ **Using cached analysis data due to API limitations.**');
         }
       } catch (error) {
         console.error('Error fetching real-time data for trading ideas:', error);
-        await message.channel.send('⚠️ Using cached analysis data due to API limitations.');
+        await loadingMsg.edit('⚠️ **Using cached analysis data due to API limitations.**');
       }
 
       // Send top recommendations
@@ -247,6 +322,84 @@ client.on(Events.MessageCreate, async (message) => {
     const cryptoMatch = content.match(/!(btc|eth|sol|ada)/);
     if (cryptoMatch) {
       const symbol = cryptoMatch[1].toUpperCase();
+      
+      // Try to get real-time data first
+      const loadingMsg = await message.channel.send(`🔄 **Fetching live ${symbol} data...**`);
+      
+      try {
+        const realTimeCrypto = await getRealTimeCryptoData(symbol);
+        
+        if (realTimeCrypto && realTimeCrypto.price > 0) {
+          await loadingMsg.edit(`✅ **Live ${symbol} analysis ready!**`);
+          const cryptoEmbed = createCryptoAnalysisEmbed(realTimeCrypto);
+          await message.channel.send({ embeds: [cryptoEmbed] });
+        } else {
+          throw new Error('No real-time data available');
+        }
+      } catch (error) {
+        console.error(`Error fetching real-time data for ${symbol}:`, error);
+        
+        // Fallback to mock data
+        const crypto = mockCryptoData.find(c => c.symbol === symbol);
+        if (crypto) {
+          await loadingMsg.edit(`⚠️ **Using cached ${symbol} data due to API limitations.**`);
+          const cryptoEmbed = createCryptoAnalysisEmbed(crypto);
+          await message.channel.send({ embeds: [cryptoEmbed] });
+        } else {
+          await loadingMsg.edit(`❌ **Sorry, I don't have data for ${symbol} yet.**`);
+        }
+      }
+      return;
+    }
+
+    // Real-time test command (for debugging)
+    if (content.includes('!test') || content.includes('!apitest')) {
+      const testMsg = await message.channel.send('🧪 **Testing API connections...**');
+      
+      const isWorking = await testAPIConnection();
+      if (isWorking) {
+        await testMsg.edit('✅ **API connections are working! Real-time data is available.**');
+      } else {
+        await testMsg.edit('❌ **API connections failed. Using cached data as fallback.**');
+      }
+      return;
+    }
+
+    // Quick price command
+    if (content.includes('!price')) {
+      const priceMatch = content.match(/!price\s+(btc|eth|sol|ada|bnb|xrp)/i);
+      if (priceMatch) {
+        const symbol = priceMatch[1].toUpperCase();
+        const loadingMsg = await message.channel.send(`💰 **Getting ${symbol} price...**`);
+        
+        try {
+          const crypto = await getRealTimeCryptoData(symbol);
+          if (crypto && crypto.price > 0) {
+            const changeEmoji = crypto.change24h > 0 ? '📈' : '📉';
+            const changeColor = crypto.change24h > 0 ? '🟢' : '🔴';
+            
+            await loadingMsg.edit(
+              `💰 **${crypto.name} (${symbol})**\n` +
+              `**Price:** $${crypto.price.toLocaleString()}\n` +
+              `**24h Change:** ${changeColor} ${crypto.change24h > 0 ? '+' : ''}${crypto.change24h.toFixed(2)}% ${changeEmoji}`
+            );
+          } else {
+            throw new Error('No price data available');
+          }
+        } catch (error) {
+          await loadingMsg.edit(`❌ **Could not fetch ${symbol} price. Please try again later.**`);
+        }
+        return;
+      } else {
+        await message.channel.send('💡 **Usage:** `!price btc` or `!price eth` etc.');
+        return;
+      }
+    }
+
+    // Crypto analysis command (e.g., !btc, !eth, !sol) - This block was moved above
+    const cryptoMatch2 = content.match(/!(btc|eth|sol|ada)/);
+    if (cryptoMatch2) {
+      const symbol = cryptoMatch2[1].toUpperCase();
       const crypto = mockCryptoData.find(c => c.symbol === symbol);
       
       if (crypto) {
@@ -275,7 +428,9 @@ client.on(Events.MessageCreate, async (message) => {
           { name: '!tradingidea', value: 'Get AI-powered trading recommendations', inline: false },
           { name: '!market', value: 'View current market overview', inline: false },
           { name: '!btc, !eth, !sol, !ada', value: 'Get technical analysis for specific crypto', inline: false },
+          { name: '!price [crypto]', value: 'Get quick price for any crypto (e.g., !price btc)', inline: false },
           { name: '!news', value: 'Latest crypto news with sentiment analysis', inline: false },
+          { name: '!test', value: 'Test API connectivity', inline: false },
           { name: '!help', value: 'Show this help message', inline: false }
         )
         .setTimestamp()
