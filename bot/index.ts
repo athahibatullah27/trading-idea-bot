@@ -334,7 +334,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         
         // Fetch real-time news from CryptoCompare
         console.log('📰 Slash command: Fetching real-time news from CryptoCompare...');
-        const realTimeNews = await fetchCoinDeskNews(5);
+        const realTimeNews = await fetchCoinDeskNews(5); // Limit to 5 articles for Discord embed
         
         if (realTimeNews.length > 0) {
           console.log(`✅ Slash command: Successfully fetched ${realTimeNews.length} real-time news articles`);
@@ -691,7 +691,7 @@ client.on(Events.MessageCreate, async (message) => {
       
       try {
         // Fetch real-time news from CryptoCompare
-        const realTimeNews = await fetchCoinDeskNews(5);
+        const realTimeNews = await fetchCoinDeskNews(5); // Limit to 5 articles for Discord embed
         
         if (realTimeNews.length > 0) {
           await loadingMsg.edit(`✅ **Found ${realTimeNews.length} latest crypto news articles!**`);

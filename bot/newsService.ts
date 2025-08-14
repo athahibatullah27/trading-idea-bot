@@ -132,10 +132,10 @@ function formatTimestamp(publishedOn: number): string {
 // Main function to fetch news from CoinDesk API
 export async function fetchCoinDeskNews(limit: number = 10): Promise<NewsItem[]> {
   try {
-    console.log(`📰 Fetching ${limit} latest news articles from CoinDesk API...`);
+    console.log(`📰 Fetching ${limit} latest news articles from CryptoCompare API...`);
     
     const url = `${CRYPTOCOMPARE_API_BASE}/data/v2/news/?lang=EN&sortOrder=latest&limit=${limit}`;
-    console.log(`🌐 CoinDesk API URL: ${url}`);
+    console.log(`🌐 CryptoCompare API URL: ${url}`);
     
     const response = await axios.get<CryptoCompareResponse>(
       url,
@@ -149,20 +149,40 @@ export async function fetchCoinDeskNews(limit: number = 10): Promise<NewsItem[]>
       }
     );
     
-    console.log(`📊 CoinDesk API Response Status: ${response.status}`);
-    console.log(`📊 CoinDesk API Response Headers:`, response.headers);
-    console.log(`📊 CoinDesk API Response Data (first 500 chars):`, JSON.stringify(response.data).substring(0, 500));
+    console.log(`📊 CryptoCompare API Response Status: ${response.status}`);
+    console.log(`📊 CryptoCompare API Response Headers:`, response.headers);
+    console.log(`📊 CryptoCompare API Response Data (first 500 chars):`, JSON.stringify(response.data).substring(0, 500));
     
-    if (!response.data || !response.data.Data) {
-      console.error('❌ CoinDesk API returned invalid structure:', response.data);
+    // Handle both possible response structures
+    let articles: CryptoCompareArticle[] = [];
+    
+    if (response.data.Data && Array.isArray(response.data.Data)) {
+      // New structure with uppercase fields
+      articles = response.data.Data;
+      console.log(`✅ Successfully fetched ${articles.length} articles from CryptoCompare (uppercase structure)`);
+    } else if (response.data.data && Array.isArray(response.data.data)) {
+      // Alternative structure with lowercase fields
+      articles = response.data.data.map((item: any) => ({
+        ID: item.id,
+        TITLE: item.title,
+        BODY: item.body,
+        PUBLISHED_ON: item.published_on,
+        URL: item.url,
+        SOURCE_DATA: item.source_data || { name: item.source || 'CryptoCompare' },
+        SENTIMENT: item.sentiment
+      }));
+      console.log(`✅ Successfully fetched ${articles.length} articles from CryptoCompare (lowercase structure)`);
+    } else {
+      console.error('❌ CryptoCompare API returned invalid structure:', response.data);
       throw new Error('Invalid response format from CryptoCompare API');
     }
     
-    const articles = response.data.Data;
-    console.log(`✅ Successfully fetched ${articles.length} articles from CryptoCompare`);
+    // Limit articles to requested amount to avoid Discord embed limits
+    const limitedArticles = articles.slice(0, limit);
+    console.log(`📊 Using ${limitedArticles.length} articles (limited from ${articles.length})`);
     
     // Convert CryptoCompare articles to our NewsItem format
-    const newsItems: NewsItem[] = articles.map((article: CryptoCompareArticle) => {
+    const newsItems: NewsItem[] = limitedArticles.map((article: CryptoCompareArticle) => {
       // Use CryptoCompare's built-in sentiment if available, otherwise analyze
       let sentiment: 'bullish' | 'bearish' | 'neutral' = 'neutral';
       if (article.SENTIMENT) {
