@@ -44,7 +44,8 @@ export async function getRealTimeCryptoData(symbol: string): Promise<CryptoData 
 // Function to get multiple crypto data at once via proxy
 export async function getMultipleCryptoData(symbols: string[]): Promise<CryptoData[]> {
   try {
-    console.log(`🔄 Fetching data for multiple cryptos via proxy: ${symbols.join(', ')}`);
+    console.log(`🔄 Frontend: Fetching data for multiple cryptos via proxy: ${symbols.join(', ')}`);
+    console.log(`🌐 Frontend: Attempting to connect to ${API_PROXY_BASE}/multiple-crypto-data`);
     
     const response = await fetch(`${API_PROXY_BASE}/multiple-crypto-data?symbols=${symbols.join(',')}`, {
       method: 'GET',
@@ -56,16 +57,24 @@ export async function getMultipleCryptoData(symbols: string[]): Promise<CryptoDa
     });
     
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorText = await response.text().catch(() => 'Unable to read error response');
+      throw new Error(`HTTP ${response.status} ${response.statusText}: ${errorText}`);
     }
     
     const data = await response.json();
     
-    console.log(`✅ Successfully fetched data for ${data.length}/${symbols.length} cryptos via proxy`);
+    console.log(`✅ Frontend: Successfully fetched data for ${data.length}/${symbols.length} cryptos via proxy`);
+    console.log(`📊 Frontend: Received data for:`, data.map(d => `${d.symbol}: $${d.price.toLocaleString()}`));
     return data;
 
   } catch (error) {
-    console.error('❌ Error fetching multiple crypto data via proxy:', error.message);
+    console.error('❌ Frontend: Error fetching multiple crypto data via proxy:', error.message);
+    console.error('🔍 Frontend: Error details:', {
+      errorType: error.constructor.name,
+      message: error.message,
+      proxyUrl: `${API_PROXY_BASE}/multiple-crypto-data`,
+      requestedSymbols: symbols
+    });
     
     // Fallback to mock data if proxy server is not available
     const fallbackData = symbols.map(symbol => 
@@ -73,7 +82,8 @@ export async function getMultipleCryptoData(symbols: string[]): Promise<CryptoDa
     ).filter(Boolean) as CryptoData[];
     
     if (fallbackData.length > 0) {
-      console.log(`📦 Using fallback mock data for ${fallbackData.length} cryptos`);
+      console.log(`📦 Frontend: Using fallback mock data for ${fallbackData.length} cryptos`);
+      console.log(`📊 Frontend: Mock data prices:`, fallbackData.map(d => `${d.symbol}: $${d.price.toLocaleString()}`));
       return fallbackData;
     }
     
@@ -84,7 +94,8 @@ export async function getMultipleCryptoData(symbols: string[]): Promise<CryptoDa
 // Function to test API connectivity via proxy
 export async function testAPIConnection(): Promise<boolean> {
   try {
-    console.log('🧪 Testing API connection via proxy...');
+    console.log('🧪 Frontend: Testing API connection via proxy...');
+    console.log(`🌐 Frontend: Testing connection to ${API_PROXY_BASE}/test-connection`);
     
     const response = await fetch(`${API_PROXY_BASE}/test-connection`, {
       method: 'GET',
@@ -96,19 +107,26 @@ export async function testAPIConnection(): Promise<boolean> {
     });
     
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorText = await response.text().catch(() => 'Unable to read error response');
+      throw new Error(`HTTP ${response.status} ${response.statusText}: ${errorText}`);
     }
     
     const data = await response.json();
     
     if (data.connected) {
-      console.log('✅ API connection test successful via proxy');
+      console.log('✅ Frontend: API connection test successful via proxy');
       return true;
     }
+    console.log('❌ Frontend: API connection test failed - backend reports not connected');
     return false;
   } catch (error) {
-    console.log('❌ API connection test failed via proxy:', error.message);
-    console.log('💡 Make sure the Discord bot is running with: npm run bot');
+    console.log('❌ Frontend: API connection test failed via proxy:', error.message);
+    console.error('🔍 Frontend: Connection test error details:', {
+      errorType: error.constructor.name,
+      message: error.message,
+      proxyUrl: `${API_PROXY_BASE}/test-connection`
+    });
+    console.log('💡 Frontend: Make sure the Discord bot is running with: npm run bot');
     return false;
   }
 }
@@ -268,9 +286,25 @@ export async function getMarketConditions(cryptoData: CryptoData[]): Promise<Mar
   const btcData = cryptoData.find(c => c.symbol === 'BTC');
   const ethData = cryptoData.find(c => c.symbol === 'ETH');
   
-  const totalMarketCap = cryptoData.reduce((sum, crypto) => sum + crypto.marketCap, 0);
-  const btcDominance = btcData ? (btcData.marketCap / totalMarketCap) * 100 : 54.2;
-  const ethDominance = ethData ? (ethData.marketCap / totalMarketCap) * 100 : 17.8;
+  // Only calculate dominance if we have valid market cap data
+  let btcDominance = 54.2; // Default fallback
+  let ethDominance = 17.8; // Default fallback
+  
+  if (btcData && ethData && btcData.marketCap > 0 && ethData.marketCap > 0) {
+    // Use real market cap data to calculate actual dominance
+    const totalMarketCap = cryptoData
+      .filter(crypto => crypto.marketCap > 0)
+      .reduce((sum, crypto) => sum + crypto.marketCap, 0);
+    
+    if (totalMarketCap > 0) {
+      btcDominance = (btcData.marketCap / totalMarketCap) * 100;
+      ethDominance = (ethData.marketCap / totalMarketCap) * 100;
+      
+      console.log(`📊 Calculated real dominance - BTC: ${btcDominance.toFixed(1)}%, ETH: ${ethDominance.toFixed(1)}%`);
+    }
+  } else {
+    console.log('📦 Using fallback dominance values due to missing market cap data');
+  }
 
   return {
     overall,
