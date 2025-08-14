@@ -6,7 +6,7 @@ dotenv.config();
 
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
 export async function generateGeminiRecommendations(
   cryptoData: CryptoData[],
@@ -131,8 +131,28 @@ function parseGeminiResponse(text: string, cryptoData: CryptoData[]): TradingRec
       jsonText = jsonText.replace(/```\n?/, '').replace(/\n?```$/, '');
     }
     
+    // Additional cleaning for potential formatting issues
+    jsonText = jsonText.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+    
+    // Find the JSON array bounds more reliably
+    const startIndex = jsonText.indexOf('[');
+    const lastIndex = jsonText.lastIndexOf(']');
+    
+    if (startIndex === -1 || lastIndex === -1 || startIndex >= lastIndex) {
+      throw new Error('No valid JSON array found in response');
+    }
+    
+    // Extract only the JSON array part
+    jsonText = jsonText.substring(startIndex, lastIndex + 1);
+    
+    console.log('🔍 Cleaned JSON for parsing:', jsonText.substring(0, 200) + '...');
+    
     // Parse the JSON
     const recommendations: TradingRecommendation[] = JSON.parse(jsonText);
+    
+    if (!Array.isArray(recommendations)) {
+      throw new Error('Response is not an array');
+    }
     
     // Validate and sanitize the recommendations
     const validRecommendations = recommendations
@@ -154,7 +174,82 @@ function parseGeminiResponse(text: string, cryptoData: CryptoData[]): TradingRec
     
   } catch (error) {
     console.error('❌ Error parsing Gemini response:', error.message);
-    console.log('📄 Raw response:', text.substring(0, 500) + '...');
+    console.log('📄 Raw response (first 500 chars):', text.substring(0, 500) + '...');
+    console.log('📄 Raw response (last 500 chars):', '...' + text.substring(Math.max(0, text.length - 500)));
+    
+    // Try to extract partial JSON if possible
+    try {
+      const startIndex = text.indexOf('[');
+      if (startIndex !== -1) {
+        // Try to find a complete JSON object within the response
+        let braceCount = 0;
+        let inString = false;
+        let escapeNext = false;
+        let endIndex = -1;
+        
+        for (let i = startIndex; i < text.length; i++) {
+          const char = text[i];
+          
+          if (escapeNext) {
+            escapeNext = false;
+            continue;
+          }
+          
+          if (char === '\\') {
+            escapeNext = true;
+            continue;
+          }
+          
+          if (char === '"') {
+            inString = !inString;
+            continue;
+          }
+          
+          if (!inString) {
+            if (char === '[') braceCount++;
+            if (char === ']') {
+              braceCount--;
+              if (braceCount === 0) {
+                endIndex = i;
+                break;
+              }
+            }
+          }
+        }
+        
+        if (endIndex !== -1) {
+          const partialJson = text.substring(startIndex, endIndex + 1);
+          console.log('🔄 Attempting to parse partial JSON...');
+          const partialRecommendations = JSON.parse(partialJson);
+          
+          if (Array.isArray(partialRecommendations) && partialRecommendations.length > 0) {
+            console.log('✅ Successfully parsed partial JSON with', partialRecommendations.length, 'recommendations');
+            
+            // Apply the same validation as above
+            const validRecommendations = partialRecommendations
+              .filter(rec => rec.crypto && rec.action && rec.confidence !== undefined)
+              .map(rec => ({
+                crypto: rec.crypto.toUpperCase(),
+                action: ['buy', 'sell', 'hold'].includes(rec.action) ? rec.action : 'hold',
+                confidence: Math.max(0, Math.min(100, Math.round(rec.confidence))),
+                targetPrice: Math.max(0, Math.round(rec.targetPrice || 0)),
+                stopLoss: Math.max(0, Math.round(rec.stopLoss || 0)),
+                reasoning: Array.isArray(rec.reasoning) ? rec.reasoning.slice(0, 4) : ['AI analysis completed'],
+                timeframe: rec.timeframe || '1-4 weeks',
+                riskLevel: ['low', 'medium', 'high'].includes(rec.riskLevel) ? rec.riskLevel : 'medium'
+              }))
+              .filter(rec => cryptoData.some(crypto => crypto.symbol === rec.crypto));
+            
+            if (validRecommendations.length > 0) {
+              return validRecommendations;
+            }
+          }
+        }
+      }
+    } catch (partialError) {
+      console.log('❌ Partial JSON parsing also failed:', partialError.message);
+    }
+    
     return [];
   }
 }
