@@ -2,14 +2,31 @@ import axios from 'axios';
 import { NewsItem } from '../src/types/trading.js';
 
 // CoinDesk API configuration
-const COINDESK_API_BASE = 'https://data-api.coindesk.com';
+const CRYPTOCOMPARE_API_BASE = 'https://min-api.cryptocompare.com';
 
+interface CryptoCompareArticle {
+  ID: number;
+  TITLE: string;
+  BODY?: string;
+  PUBLISHED_ON: number;
+  URL: string;
+  SOURCE_DATA?: {
+    name: string;
+  };
+  SENTIMENT?: string;
+}
+
+interface CryptoCompareResponse {
+  Data: CryptoCompareArticle[];
+  Err: any;
+}
+
+// Legacy interface for backward compatibility
 interface CoinDeskArticle {
-  id: string;
+  ID: number;
   title: string;
   summary?: string;
-  published_at: string;
-  updated_at: string;
+  published_at: number;
   url: string;
   tags?: string[];
   authors?: Array<{
@@ -192,7 +209,7 @@ export async function fetchCoinDeskNews(limit: number = 10): Promise<NewsItem[]>
   }
 }
 
-// Function to test CoinDesk API connectivity
+// Function to test CryptoCompare API connectivity
 export async function testCoinDeskAPI(): Promise<boolean> {
   try {
     console.log('🧪 Testing CryptoCompare News API connectivity...');
