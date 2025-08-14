@@ -9,67 +9,85 @@ export async function getRealTimeCryptoData(symbol: string): Promise<CryptoData 
   try {
     console.log(`Fetching real-time data for ${symbol}...`);
     
-    // TradingView scanner API request
-    const scannerData = {
-      filter: [
-        { left: "name", operation: "match", right: `BINANCE:${symbol}USDT` }
-      ],
-      options: { lang: "en" },
-      symbols: {
-        query: { types: [] },
-        tickers: [`BINANCE:${symbol}USDT`]
-      },
-      columns: [
-        "name", "close", "change", "change_abs", "volume", 
-        "market_cap_basic", "RSI", "MACD.macd", "BB.upper", "BB.lower", "BB.basis"
-      ],
-      sort: { sortBy: "name", sortOrder: "asc" },
-      range: [0, 1]
-    };
+    // Try multiple ticker formats for better success rate
+    const tickerFormats = [
+      `BINANCE:${symbol}USDT`,
+      `BINANCE:${symbol}USD`,
+      `COINBASE:${symbol}USD`,
+      `KRAKEN:${symbol}USD`,
+      `BITSTAMP:${symbol}USD`
+    ];
 
-    const response = await axios.post(`${TRADINGVIEW_API_BASE}/america/scan`, scannerData, {
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      },
-      timeout: 10000
-    });
+    for (const ticker of tickerFormats) {
+      try {
+        console.log(`Trying TradingView ticker: ${ticker}`);
+        
+        const scannerData = {
+          options: { lang: "en" },
+          symbols: {
+            query: { types: [] },
+            tickers: [ticker]
+          },
+          columns: [
+            "name", "close", "change", "change_abs", "volume", 
+            "market_cap_basic", "RSI", "MACD.macd", "BB.upper", "BB.lower", "BB.basis"
+          ],
+          sort: { sortBy: "name", sortOrder: "asc" },
+          range: [0, 1]
+        };
 
-    if (!response.data || !response.data.data || response.data.data.length === 0) {
-      throw new Error('No data received from TradingView API');
+        const response = await axios.post(`${TRADINGVIEW_API_BASE}/america/scan`, scannerData, {
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          },
+          timeout: 8000
+        });
+
+        if (response.data && response.data.data && response.data.data.length > 0) {
+          const data = response.data.data[0].d;
+          
+          // Parse the data array
+          const [
+            name, price, changePercent, changeAbs, volume, 
+            marketCap, rsi, macd, bbUpper, bbLower, bbMiddle
+          ] = data;
+
+          // Validate that we have essential data
+          if (price && price > 0) {
+            const cryptoData: CryptoData = {
+              symbol: symbol,
+              name: getCryptoName(symbol),
+              price: price,
+              change24h: changePercent || 0,
+              volume: volume || 0,
+              marketCap: marketCap || 0,
+              rsi: rsi || 50,
+              macd: macd || 0,
+              bollinger: {
+                upper: bbUpper || price * 1.02,
+                middle: bbMiddle || price,
+                lower: bbLower || price * 0.98
+              }
+            };
+
+            console.log(`✅ Successfully fetched TradingView data for ${symbol} via ${ticker}:`, {
+              price: price,
+              change24h: changePercent?.toFixed(2) + '%',
+              rsi: rsi?.toFixed(1)
+            });
+
+            return cryptoData;
+          }
+        }
+      } catch (tickerError) {
+        console.log(`Failed to fetch from ${ticker}:`, tickerError.message);
+        continue; // Try next ticker format
+      }
     }
 
-    const data = response.data.data[0].d;
-    
-    // Parse the data array
-    const [
-      name, price, changePercent, changeAbs, volume, 
-      marketCap, rsi, macd, bbUpper, bbLower, bbMiddle
-    ] = data;
-
-    const cryptoData: CryptoData = {
-      symbol: symbol,
-      name: getCryptoName(symbol),
-      price: price || 0,
-      change24h: changePercent || 0,
-      volume: volume || 0,
-      marketCap: marketCap || 0,
-      rsi: rsi || 50,
-      macd: macd || 0,
-      bollinger: {
-        upper: bbUpper || price * 1.02,
-        middle: bbMiddle || price,
-        lower: bbLower || price * 0.98
-      }
-    };
-
-    console.log(`✅ Successfully fetched real-time data for ${symbol}:`, {
-      price: price,
-      change24h: changePercent?.toFixed(2) + '%',
-      rsi: rsi?.toFixed(1)
-    });
-
-    return cryptoData;
+    // If all TradingView attempts failed
+    throw new Error('No data received from TradingView API with any ticker format');
 
   } catch (error) {
     console.error(`❌ Error fetching real-time data for ${symbol}:`, error.message);
@@ -106,7 +124,12 @@ async function getAlternativeData(symbol: string): Promise<CryptoData | null> {
 
     const response = await axios.get(
       `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&include_24hr_change=true&include_market_cap=true&include_24hr_vol=true`,
-      { timeout: 8000 }
+      { 
+        timeout: 8000,
+        headers: {
+          'User-Agent': 'CryptoTrader-Bot/1.0'
+        }
+      }
     );
 
     const data = response.data[coinId];
@@ -168,6 +191,32 @@ function getCryptoName(symbol: string): string {
 export async function getMultipleCryptoData(symbols: string[]): Promise<CryptoData[]> {
   console.log(`🔄 Fetching data for multiple cryptos: ${symbols.join(', ')}`);
   
+  // Add delay between requests to avoid rate limiting
+  const results: CryptoData[] = [];
+  
+  for (let i = 0; i < symbols.length; i++) {
+    const symbol = symbols[i];
+    
+    try {
+      const data = await getRealTimeCryptoData(symbol);
+      if (data) {
+        results.push(data);
+      }
+    } catch (error) {
+      console.error(`Failed to fetch data for ${symbol}:`, error.message);
+    }
+    
+    // Add delay between requests (except for the last one)
+    if (i < symbols.length - 1) {
+      console.log(`⏳ Waiting 300ms before next request to avoid rate limits...`);
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+  }
+  
+  console.log(`✅ Successfully fetched data for ${results.length}/${symbols.length} cryptos`);
+  return results;
+
+  /* Old parallel approach - keeping as backup
   const promises = symbols.map(symbol => getRealTimeCryptoData(symbol));
   const results = await Promise.allSettled(promises);
   
@@ -180,6 +229,7 @@ export async function getMultipleCryptoData(symbols: string[]): Promise<CryptoDa
   console.log(`✅ Successfully fetched data for ${successfulResults.length}/${symbols.length} cryptos`);
   
   return successfulResults;
+  */
 }
 
 // Function to test API connectivity
