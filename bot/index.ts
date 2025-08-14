@@ -514,15 +514,18 @@ function createRecommendationEmbed(recommendation: TradingRecommendation) {
 }
 
 // Helper function to create news embed
-function createNewsEmbed() {
+function createNewsEmbed(newsData?: NewsItem[]) {
+  const newsToDisplay = newsData || mockNews.slice(0, 5);
+  const isRealTime = !!newsData;
+  
   const embed = new EmbedBuilder()
     .setColor(0x3b82f6)
-    .setTitle('📰 Latest Crypto News & Sentiment')
-    .setDescription('Recent market-moving news with sentiment analysis')
+    .setTitle(`📰 ${isRealTime ? 'Live' : 'Cached'} Crypto News & Sentiment`)
+    .setDescription(`${isRealTime ? 'Real-time' : 'Recent'} market-moving news with sentiment analysis`)
     .setTimestamp()
-    .setFooter({ text: 'CryptoTrader Bot • News Analysis' });
+    .setFooter({ text: `CryptoTrader Bot • ${isRealTime ? 'Live' : 'Cached'} News Analysis` });
 
-  mockNews.slice(0, 5).forEach((news: NewsItem, index: number) => {
+  newsToDisplay.forEach((news: NewsItem, index: number) => {
     const sentimentEmoji = news.sentiment === 'bullish' ? '🟢' : 
                           news.sentiment === 'bearish' ? '🔴' : '🟡';
     const impactEmoji = news.impact === 'high' ? '🔥' : 
@@ -661,8 +664,27 @@ client.on(Events.MessageCreate, async (message) => {
 
     // News command
     if (content.includes('!news') || content.includes('crypto news')) {
-      const newsEmbed = createNewsEmbed();
-      await message.channel.send({ embeds: [newsEmbed] });
+      const loadingMsg = await message.channel.send('📰 **Fetching latest crypto news...**');
+      
+      try {
+        // Fetch real-time news from CryptoCompare
+        const realTimeNews = await fetchCoinDeskNews(5);
+        
+        if (realTimeNews.length > 0) {
+          await loadingMsg.edit(`✅ **Found ${realTimeNews.length} latest crypto news articles!**`);
+          const newsEmbed = createNewsEmbed(realTimeNews);
+          await message.channel.send({ embeds: [newsEmbed] });
+        } else {
+          await loadingMsg.edit('⚠️ **Using cached news due to API limitations.**');
+          const newsEmbed = createNewsEmbed();
+          await message.channel.send({ embeds: [newsEmbed] });
+        }
+      } catch (error) {
+        console.error('Error fetching real-time news for !news command:', error);
+        await loadingMsg.edit('⚠️ **Using cached news due to API error.**');
+        const newsEmbed = createNewsEmbed();
+        await message.channel.send({ embeds: [newsEmbed] });
+      }
       return;
     }
 
