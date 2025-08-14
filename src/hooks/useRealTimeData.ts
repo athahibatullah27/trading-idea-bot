@@ -3,7 +3,7 @@ import { CryptoData, NewsItem, TradingRecommendation, MarketConditions, Geopolit
 import { 
   getMultipleCryptoData, 
   getRealTimeNews, 
-  generateRecommendations, 
+  getGeminiRecommendationsFromAPI,
   getMarketConditions,
   testAPIConnection 
 } from '../services/tradingService';
@@ -64,8 +64,8 @@ export function useRealTimeData(): UseRealTimeDataReturn {
       if (newCryptoData.length > 0) {
         setCryptoData(newCryptoData);
         
-        // Generate recommendations based on real data
-        const newRecommendations = await generateRecommendations(newCryptoData);
+        // Get Gemini-powered recommendations
+        const newRecommendations = await getGeminiRecommendationsFromAPI();
         setRecommendations(newRecommendations);
         
         // Update market conditions based on real data

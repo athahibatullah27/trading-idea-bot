@@ -131,6 +131,55 @@ export async function testAPIConnection(): Promise<boolean> {
   }
 }
 
+// Function to get Gemini-powered recommendations from API
+export async function getGeminiRecommendationsFromAPI(): Promise<TradingRecommendation[]> {
+  try {
+    console.log('🤖 Frontend: Requesting Gemini recommendations via proxy...');
+    console.log(`🌐 Frontend: Connecting to ${API_PROXY_BASE}/gemini-recommendations`);
+    
+    const response = await fetch(`${API_PROXY_BASE}/gemini-recommendations`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      // Add timeout for Gemini API calls (they might take longer)
+      signal: AbortSignal.timeout(30000) // 30 second timeout
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.log(`❌ Frontend: Gemini API returned ${response.status} ${response.statusText}`);
+      
+      // Log the user-friendly error message
+      if (errorData.userMessage) {
+        console.log(`💬 Frontend: ${errorData.userMessage}`);
+      }
+      
+      throw new Error(errorData.userMessage || `HTTP ${response.status} ${response.statusText}`);
+    }
+    
+    const recommendations = await response.json();
+    
+    console.log(`✅ Frontend: Successfully received ${recommendations.length} Gemini recommendations`);
+    console.log(`🎯 Frontend: Gemini recommendations:`, recommendations.map(r => 
+      `${r.crypto}: ${r.action.toUpperCase()} (${r.confidence}% confidence)`
+    ));
+    
+    return recommendations;
+
+  } catch (error) {
+    console.error('❌ Frontend: Error fetching Gemini recommendations via proxy:', error.message);
+    console.error('🔍 Frontend: Gemini error details:', {
+      errorType: error.constructor.name,
+      message: error.message,
+      proxyUrl: `${API_PROXY_BASE}/gemini-recommendations`
+    });
+    
+    // Return empty array - the UI will handle showing error state
+    return [];
+  }
+}
+
 // Function to get real-time news (mock for now, can be replaced with real news API)
 export async function getRealTimeNews(): Promise<NewsItem[]> {
   // This would typically fetch from a real news API

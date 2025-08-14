@@ -110,12 +110,32 @@ function App() {
                   <TradingRecommendation key={index} recommendation={recommendation} />
                 )) : (
                   <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 text-center">
-                    <div className="text-gray-400 mb-2">
-                      <RefreshCw className="w-6 h-6 mx-auto mb-2 animate-spin" />
+                    {isLoading ? (
+                      <div className="text-gray-400 mb-2">
+                        <RefreshCw className="w-6 h-6 mx-auto mb-2 animate-spin" />
+                        <p className="text-gray-300">Generating AI recommendations...</p>
+                        <p className="text-gray-500 text-sm mt-1">Based on real-time market data</p>
+                      </div>
+                    ) : (
+                      <div className="text-yellow-400 mb-2">
+                        <div className="w-12 h-12 mx-auto mb-3 bg-yellow-400/10 rounded-full flex items-center justify-center">
+                          <span className="text-2xl">⚠️</span>
+                        </div>
+                        <p className="text-white font-medium mb-2">AI Analysis Unavailable</p>
+                        <p className="text-gray-300 text-sm mb-3">
+                          Our AI trading analysis is currently unavailable. This could be due to:
+                        </p>
+                        <ul className="text-gray-400 text-sm text-left max-w-md mx-auto space-y-1">
+                          <li>• High demand on AI services</li>
+                          <li>• Temporary maintenance</li>
+                          <li>• Market data connectivity issues</li>
+                        </ul>
+                        <p className="text-blue-400 text-sm mt-3">
+                          Please try refreshing in a few minutes
+                        </p>
+                      </div>
+                    )}
                     </div>
-                    <p className="text-gray-300">Generating AI recommendations...</p>
-                    <p className="text-gray-500 text-sm mt-1">Based on real-time market data</p>
-                  </div>
                 )}
               </div>
             </section>

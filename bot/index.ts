@@ -11,6 +11,7 @@ import {
 } from '../src/data/mockData.js';
 import { TradingRecommendation, CryptoData, NewsItem } from '../src/types/trading.js';
 import { getRealTimeCryptoData, getMultipleCryptoData, testAPIConnection } from './tradingview.js';
+import { generateGeminiRecommendations } from './geminiService.js';
 
 // Load environment variables
 dotenv.config();
@@ -65,6 +66,48 @@ app.get('/api/test-connection', async (req, res) => {
   } catch (error) {
     console.error('API test error:', error);
     res.status(500).json({ connected: false, error: 'Test failed' });
+  }
+});
+
+// API endpoint for Gemini-powered recommendations
+app.get('/api/gemini-recommendations', async (req, res) => {
+  try {
+    console.log('🤖 Generating Gemini recommendations...');
+    
+    // Fetch latest crypto data
+    const symbols = ['BTC', 'ETH', 'SOL', 'ADA'];
+    const cryptoData = await getMultipleCryptoData(symbols);
+    
+    if (cryptoData.length === 0) {
+      return res.status(503).json({ 
+        error: 'Unable to fetch market data for analysis. Please try again later.',
+        userMessage: 'Market data is currently unavailable. Please check back in a few minutes.'
+      });
+    }
+    
+    // Generate recommendations using Gemini
+    const recommendations = await generateGeminiRecommendations(
+      cryptoData,
+      mockNews.slice(0, 3), // Include recent news
+      mockMarketConditions   // Include market conditions
+    );
+    
+    if (recommendations.length === 0) {
+      return res.status(503).json({ 
+        error: 'AI analysis service is temporarily unavailable. Please try again later.',
+        userMessage: 'Our AI trading analysis is currently unavailable. This could be due to high demand or maintenance. Please try again in a few minutes.'
+      });
+    }
+    
+    console.log(`✅ Successfully generated ${recommendations.length} Gemini recommendations`);
+    res.json(recommendations);
+    
+  } catch (error) {
+    console.error('Gemini recommendations error:', error);
+    res.status(500).json({ 
+      error: 'AI analysis service encountered an error. Please try again later.',
+      userMessage: 'We encountered an issue while analyzing the market. Please try again in a few minutes.'
+    });
   }
 });
 

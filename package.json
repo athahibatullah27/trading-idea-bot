@@ -13,6 +13,7 @@
     "start:bot": "node --loader tsx/esm bot/index.ts"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "axios": "^1.11.0",
     "concurrently": "^9.2.0",
     "cors": "^2.8.5",
