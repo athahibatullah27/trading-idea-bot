@@ -115,26 +115,29 @@ function formatTimestamp(publishedAt: string): string {
 // Main function to fetch news from CoinDesk API
 export async function fetchCoinDeskNews(limit: number = 10): Promise<NewsItem[]> {
   try {
-    console.log(`📰 Fetching ${limit} latest news articles from CoinDesk...`);
+    console.log(`📰 Fetching ${limit} latest news articles from CoinDesk API...`);
+    
+    const url = `${COINDESK_API_BASE}/news/v1/article/list?limit=${limit}`;
+    console.log(`🌐 CoinDesk API URL: ${url}`);
     
     const response = await axios.get<CoinDeskResponse>(
-      `${COINDESK_API_BASE}/news/v1/article/list`,
+      url,
       {
-        params: {
-          limit: limit,
-          // You can add more parameters here if needed
-          // sort: 'published_at',
-          // order: 'desc'
-        },
         headers: {
           'User-Agent': 'CryptoTrader-Bot/1.0',
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
         },
         timeout: 10000 // 10 second timeout
       }
     );
     
+    console.log(`📊 CoinDesk API Response Status: ${response.status}`);
+    console.log(`📊 CoinDesk API Response Headers:`, response.headers);
+    console.log(`📊 CoinDesk API Response Data (first 500 chars):`, JSON.stringify(response.data).substring(0, 500));
+    
     if (!response.data || !response.data.data) {
+      console.error('❌ CoinDesk API returned invalid structure:', response.data);
       throw new Error('Invalid response format from CoinDesk API');
     }
     
@@ -171,8 +174,17 @@ export async function fetchCoinDeskNews(limit: number = 10): Promise<NewsItem[]>
       console.error('📄 CoinDesk API response:', {
         status: error.response.status,
         statusText: error.response.statusText,
-        data: error.response.data
+        headers: error.response.headers,
+        data: JSON.stringify(error.response.data).substring(0, 1000)
       });
+    } else if (error.request) {
+      console.error('📄 CoinDesk API request failed:', {
+        url: error.config?.url,
+        method: error.config?.method,
+        timeout: error.config?.timeout
+      });
+    } else {
+      console.error('📄 CoinDesk API error details:', error);
     }
     
     // Return empty array on error - calling code can handle fallback
@@ -184,28 +196,44 @@ export async function fetchCoinDeskNews(limit: number = 10): Promise<NewsItem[]>
 export async function testCoinDeskAPI(): Promise<boolean> {
   try {
     console.log('🧪 Testing CoinDesk API connectivity...');
+    const testUrl = `${COINDESK_API_BASE}/news/v1/article/list?limit=1`;
+    console.log(`🌐 Testing CoinDesk URL: ${testUrl}`);
     
     const response = await axios.get(
-      `${COINDESK_API_BASE}/news/v1/article/list?limit=1`,
+      testUrl,
       {
         headers: {
           'User-Agent': 'CryptoTrader-Bot/1.0',
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
         },
         timeout: 5000 // 5 second timeout for test
       }
     );
+    
+    console.log(`📊 CoinDesk Test Response Status: ${response.status}`);
+    console.log(`📊 CoinDesk Test Response Data:`, JSON.stringify(response.data).substring(0, 200));
     
     if (response.status === 200 && response.data && response.data.data) {
       console.log('✅ CoinDesk API test successful');
       return true;
     }
     
-    console.log('❌ CoinDesk API test failed - invalid response');
+    console.log('❌ CoinDesk API test failed - invalid response structure');
+    console.log('📄 Expected: response.data.data, Got:', typeof response.data, Object.keys(response.data || {}));
     return false;
     
   } catch (error) {
-    console.log('❌ CoinDesk API test failed:', error.message);
+    console.error('❌ CoinDesk API test failed:', error.message);
+    
+    if (error.response) {
+      console.error('📄 Test response error:', {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: JSON.stringify(error.response.data).substring(0, 500)
+      });
+    }
+    
     return false;
   }
 }
