@@ -204,11 +204,28 @@ client.on(Events.MessageCreate, async (message) => {
 
     // Trading idea command
     if (content.includes('!tradingidea') || content.includes('!idea') || content.includes('trading idea')) {
-      await message.channel.send('🤖 **Analyzing current market conditions...**');
+      await message.channel.send('🤖 **Fetching real-time market data and analyzing conditions...**');
       
       // Send market overview
       const marketEmbed = createMarketOverviewEmbed();
       await message.channel.send({ embeds: [marketEmbed] });
+
+      // Fetch real-time data for top cryptos
+      try {
+        const realTimeData = await getMultipleCryptoData(['BTC', 'ETH', 'SOL']);
+        
+        if (realTimeData.length > 0) {
+          await message.channel.send('📊 **Real-time Technical Analysis:**');
+          
+          for (const crypto of realTimeData.slice(0, 2)) {
+            const cryptoEmbed = createCryptoAnalysisEmbed(crypto);
+            await message.channel.send({ embeds: [cryptoEmbed] });
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching real-time data for trading ideas:', error);
+        await message.channel.send('⚠️ Using cached analysis data due to API limitations.');
+      }
 
       // Send top recommendations
       for (const recommendation of mockRecommendations.slice(0, 2)) {
