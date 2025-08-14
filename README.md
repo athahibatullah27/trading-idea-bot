@@ -64,11 +64,28 @@ npm run dev
 
 ## Discord Commands
 
-- `!tradingidea` - Get AI-powered trading recommendations
-- `!market` - View current market overview
-- `!btc`, `!eth`, `!sol`, `!ada` - Get technical analysis for specific crypto
-- `!news` - Latest crypto news with sentiment analysis
-- `!help` - Show available commands
+The bot uses Discord slash commands for better user experience:
+
+- `/tradingidea` - Get AI-powered trading recommendations with real-time analysis
+- `/market` - View current market overview and conditions
+- `/crypto [symbol]` - Get technical analysis for specific cryptocurrency
+- `/price [symbol]` - Get quick price information for any crypto
+- `/news` - Latest crypto news with sentiment analysis
+- `/test` - Test API connectivity and bot status
+- `/help` - Show available commands and usage
+
+### Setting Up Slash Commands
+
+To enable slash commands, you need to add these environment variables to your `.env` file:
+
+```env
+DISCORD_CLIENT_ID=your_application_client_id
+DISCORD_GUILD_ID=your_server_guild_id_for_testing
+```
+
+**Finding your Discord IDs:**
+1. **Client ID**: Go to [Discord Developer Portal](https://discord.com/developers/applications) → Your App → General Information → Application ID
+2. **Guild ID**: Right-click your Discord server → Copy Server ID (requires Developer Mode enabled in Discord settings)
 
 ## Bot Features
 

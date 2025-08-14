@@ -132,6 +132,9 @@ client.once(Events.ClientReady, (readyClient) => {
   console.log(`🤖 Discord bot is ready! Logged in as ${readyClient.user.tag}`);
   console.log(`📊 Bot is serving ${readyClient.guilds.cache.size} servers`);
   
+  // Register slash commands
+  registerSlashCommands();
+  
   // Test API connection on startup
   testAPIConnection().then(isConnected => {
     if (isConnected) {
@@ -144,6 +147,44 @@ client.once(Events.ClientReady, (readyClient) => {
   // Set bot status
   client.user?.setActivity('crypto markets 📈', { type: 3 }); // 3 = Watching
 });
+
+// Function to register slash commands
+async function registerSlashCommands() {
+  try {
+    console.log('🔄 Started refreshing application (/) commands.');
+    
+    const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN!);
+    
+    const clientId = process.env.DISCORD_CLIENT_ID;
+    const guildId = process.env.DISCORD_GUILD_ID;
+    
+    if (!clientId) {
+      console.error('❌ DISCORD_CLIENT_ID is not set in .env file');
+      return;
+    }
+    
+    // Convert commands to JSON
+    const commandsData = commands.map(command => command.toJSON());
+    
+    if (guildId) {
+      // Register commands for a specific guild (faster for development)
+      await rest.put(
+        Routes.applicationGuildCommands(clientId, guildId),
+        { body: commandsData }
+      );
+      console.log(`✅ Successfully registered ${commandsData.length} guild commands for server ${guildId}`);
+    } else {
+      // Register commands globally (takes up to 1 hour to propagate)
+      await rest.put(
+        Routes.applicationCommands(clientId),
+        { body: commandsData }
+      );
+      console.log(`✅ Successfully registered ${commandsData.length} global commands`);
+    }
+  } catch (error) {
+    console.error('❌ Error registering slash commands:', error);
+  }
+}
 
 // Helper function to create market overview embed
 function createMarketOverviewEmbed(marketConditions = mockMarketConditions) {
@@ -318,125 +359,9 @@ client.on(Events.MessageCreate, async (message) => {
     }
 
     // Trading idea command
+    // Legacy support for !tradingidea (redirect to slash command)
     if (content.includes('!tradingidea') || content.includes('!idea') || content.includes('trading idea')) {
-      const loadingMsg = await message.channel.send('🤖 **Fetching real-time market data and analyzing conditions...**');
-      
-      let fetchedCryptoData: CryptoData[] = [];
-      let currentMarketConditions = mockMarketConditions;
-
-      // Fetch real-time data for all cryptos needed (BTC, ETH, SOL, ADA) - SINGLE FETCH
-      try {
-        await loadingMsg.edit('📊 **Analyzing live market data from multiple sources...**');
-        fetchedCryptoData = await getMultipleCryptoData(['BTC', 'ETH', 'SOL', 'ADA']);
-        
-        if (fetchedCryptoData.length > 0) {
-          // Calculate market conditions based on real data
-          currentMarketConditions = await getMarketConditions(fetchedCryptoData);
-          console.log(`📊 Calculated market conditions from ${fetchedCryptoData.length} cryptos:`, currentMarketConditions);
-        } else {
-          console.log('⚠️ No real-time data available, using mock market conditions');
-        }
-      } catch (error) {
-        console.error('Error fetching real-time data for trading ideas:', error.message);
-      }
-
-      // Send market overview with real or fallback conditions
-      const marketEmbed = createMarketOverviewEmbed(currentMarketConditions);
-      await message.channel.send({ embeds: [marketEmbed] });
-
-      // Display technical analysis for available cryptos
-      if (fetchedCryptoData.length > 0) {
-        await loadingMsg.edit('✅ **Live market analysis complete!**');
-        await message.channel.send('📊 **Live Technical Analysis:**');
-        
-        for (const crypto of fetchedCryptoData.slice(0, 3)) {
-          const cryptoEmbed = createCryptoAnalysisEmbed(crypto);
-          await message.channel.send({ embeds: [cryptoEmbed] });
-        }
-      } else {
-        await loadingMsg.edit('⚠️ **Using cached analysis data due to API limitations.**');
-        await message.channel.send('📊 **Cached Technical Analysis:**');
-        
-        for (const crypto of mockCryptoData.slice(0, 2)) {
-          const cryptoEmbed = createCryptoAnalysisEmbed(crypto);
-          await message.channel.send({ embeds: [cryptoEmbed] });
-        }
-      }
-
-      // Generate AI-powered recommendations using the SAME data (no additional API calls)
-      try {
-        await loadingMsg.edit('🤖 **Generating AI-powered trading recommendations...**');
-        
-        // Use the data we already fetched instead of making another API call
-        const dataForGemini = fetchedCryptoData.length > 0 ? fetchedCryptoData : mockCryptoData.slice(0, 4);
-        
-        const recommendations = await generateGeminiRecommendations(
-          dataForGemini,
-          mockNews.slice(0, 3), // Include recent news
-          currentMarketConditions   // Use calculated market conditions
-        );
-        
-        if (recommendations && recommendations.length > 0) {
-          await loadingMsg.edit('✅ **AI recommendations ready!**');
-          await message.channel.send('🤖 **AI-Powered Trading Recommendations:**');
-          
-          // Send all available recommendations (up to 3)
-          for (const recommendation of recommendations.slice(0, 3)) {
-            const recEmbed = createRecommendationEmbed(recommendation);
-            await message.channel.send({ embeds: [recEmbed] });
-          }
-          
-          console.log(`✅ Successfully displayed ${recommendations.length} AI recommendations in Discord`);
-        } else {
-          await loadingMsg.edit('⚠️ **AI recommendations currently unavailable.**');
-          
-          const errorEmbed = new EmbedBuilder()
-            .setColor(0xffa500)
-            .setTitle('⚠️ AI Analysis Unavailable')
-            .setDescription('Our AI trading analysis is currently unavailable.')
-            .addFields(
-              { 
-                name: 'Possible Reasons:', 
-                value: '• High demand on AI services\n• Temporary maintenance\n• Market data connectivity issues', 
-                inline: false 
-              },
-              { 
-                name: '💡 What to do:', 
-                value: 'Please try the `!tradingidea` command again in a few minutes.', 
-                inline: false 
-              }
-            )
-            .setTimestamp()
-            .setFooter({ text: 'CryptoTrader Bot • AI Service Status' });
-          
-          await message.channel.send({ embeds: [errorEmbed] });
-        }
-      } catch (error) {
-        console.error('Error generating Gemini recommendations for Discord:', error.message);
-        await loadingMsg.edit('❌ **Failed to generate AI recommendations.**');
-        
-        const errorEmbed = new EmbedBuilder()
-          .setColor(0xff0000)
-          .setTitle('❌ AI Service Error')
-          .setDescription('We encountered an issue while generating trading recommendations.')
-          .addFields(
-            { 
-              name: 'Error Details:', 
-              value: `AI analysis encountered an error: ${error.message || 'Unknown error'}`, 
-              inline: false 
-            },
-            { 
-              name: '🔄 Try Again:', 
-              value: 'Please wait a few minutes and use `!tradingidea` again.', 
-              inline: false 
-            }
-          )
-          .setTimestamp()
-          .setFooter({ text: 'CryptoTrader Bot • Error Report' });
-        
-        await message.channel.send({ embeds: [errorEmbed] });
-      }
-
+      await message.channel.send('🔄 **The bot now uses slash commands!** Please use `/tradingidea` instead of `!tradingidea` for better performance and features.');
       return;
     }
 
