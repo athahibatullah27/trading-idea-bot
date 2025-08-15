@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { CryptoData, NewsItem, MarketConditions, TradingRecommendation } from '../src/types/trading.js';
-import { DerivativesMarketData } from './derivativesDataService.js';
+import { EnhancedDerivativesMarketData } from './derivativesDataService.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -267,7 +267,7 @@ function parseGeminiResponse(text: string, cryptoData: CryptoData[]): TradingRec
 }
 
 export async function generateDerivativesTradeIdea(
-  marketData: DerivativesMarketData
+  marketData: EnhancedDerivativesMarketData
 ): Promise<DerivativesTradeIdea | null> {
   try {
     console.log(`🤖 Generating derivatives trade idea for ${marketData.symbol} using Gemini...`);
@@ -278,7 +278,7 @@ export async function generateDerivativesTradeIdea(
     }
 
     // Construct the prompt for derivatives trade analysis
-    const prompt = buildDerivativesTradePrompt(marketData);
+    const prompt = buildEnhancedDerivativesTradePrompt(marketData);
     
     console.log('📝 Sending derivatives trade prompt to Gemini API...');
     
@@ -306,61 +306,89 @@ export async function generateDerivativesTradeIdea(
   }
 }
 
-function buildDerivativesTradePrompt(marketData: DerivativesMarketData): string {
-  const { symbol, technicalIndicators, marketInfo } = marketData;
+function buildEnhancedDerivativesTradePrompt(marketData: EnhancedDerivativesMarketData): string {
+  const { symbol, timeframes, market } = marketData;
   
-  return `You are an expert derivatives trader specializing in technical analysis. Based on the following technical data for ${symbol}, provide a trade idea using ONLY technical analysis.
+  return `You are an expert derivatives trader specializing in multi-timeframe technical analysis. Based on the following comprehensive technical data for ${symbol}, provide a high-confidence trade idea using ONLY technical analysis.
 
-TECHNICAL DATA FOR ${symbol}:
-- Current Price: $${technicalIndicators.currentPrice.toLocaleString()}
-- 24h Price Change: ${technicalIndicators.priceChange24h.toFixed(2)}%
-- RSI (14): ${technicalIndicators.rsi.toFixed(1)}
-- MACD: ${technicalIndicators.macd.macd.toFixed(2)} (Signal: ${technicalIndicators.macd.signal.toFixed(2)}, Histogram: ${technicalIndicators.macd.histogram.toFixed(2)})
-- Bollinger Bands: Upper $${technicalIndicators.bollinger.upper.toLocaleString()}, Middle $${technicalIndicators.bollinger.middle.toLocaleString()}, Lower $${technicalIndicators.bollinger.lower.toLocaleString()}
-- EMA 20: $${technicalIndicators.ema20.toLocaleString()}
-- EMA 50: $${technicalIndicators.ema50.toLocaleString()}
-- Support Level: $${technicalIndicators.support.toLocaleString()}
-- Resistance Level: $${technicalIndicators.resistance.toLocaleString()}
-- 24h Volume: ${technicalIndicators.volume24h.toFixed(0)}
-- Funding Rate: ${(marketInfo.fundingRate || 0) * 100}%
-- Mark Price: $${(marketInfo.markPrice || technicalIndicators.currentPrice).toLocaleString()}
+MULTI-TIMEFRAME TECHNICAL DATA FOR ${symbol}:
+Data Timestamp: ${marketData.dataTimestamp}
+
+4-HOUR TIMEFRAME ANALYSIS:
+- Current Price: $${timeframes['4h'].indicators.currentPrice.toLocaleString()}
+- RSI (14): ${timeframes['4h'].indicators.rsi.toFixed(1)} (${timeframes['4h'].indicators.rsiTrend})
+- MACD: ${timeframes['4h'].indicators.macd.macd.toFixed(2)} (Signal: ${timeframes['4h'].indicators.macd.signal.toFixed(2)}, Histogram: ${timeframes['4h'].indicators.macd.histogram.toFixed(2)}, Trend: ${timeframes['4h'].indicators.macd.trend})
+- Bollinger Bands: Upper $${timeframes['4h'].indicators.bollinger.upper.toLocaleString()}, Middle $${timeframes['4h'].indicators.bollinger.middle.toLocaleString()}, Lower $${timeframes['4h'].indicators.bollinger.lower.toLocaleString()} (${timeframes['4h'].indicators.bollinger.trend})
+- EMA 20: $${timeframes['4h'].indicators.ema20.toLocaleString()}
+- EMA 50: $${timeframes['4h'].indicators.ema50.toLocaleString()}
+- EMA Trend: ${timeframes['4h'].indicators.emaTrend}
+- Support Levels: [${timeframes['4h'].indicators.support.map(s => '$' + s.toLocaleString()).join(', ')}]
+- Resistance Levels: [${timeframes['4h'].indicators.resistance.map(r => '$' + r.toLocaleString()).join(', ')}]
+- Recent Candles (OHLCV): ${timeframes['4h'].price.recentOHLCV.slice(-3).map(c => 
+    `[O:$${c.open.toLocaleString()}, H:$${c.high.toLocaleString()}, L:$${c.low.toLocaleString()}, C:$${c.close.toLocaleString()}, V:${c.volume.toFixed(0)}]`
+  ).join(', ')}
+
+1-HOUR TIMEFRAME ANALYSIS:
+- Current Price: $${timeframes['1h'].indicators.currentPrice.toLocaleString()}
+- RSI (14): ${timeframes['1h'].indicators.rsi.toFixed(1)} (${timeframes['1h'].indicators.rsiTrend})
+- MACD: ${timeframes['1h'].indicators.macd.macd.toFixed(2)} (Signal: ${timeframes['1h'].indicators.macd.signal.toFixed(2)}, Histogram: ${timeframes['1h'].indicators.macd.histogram.toFixed(2)}, Trend: ${timeframes['1h'].indicators.macd.trend})
+- Bollinger Bands: Upper $${timeframes['1h'].indicators.bollinger.upper.toLocaleString()}, Middle $${timeframes['1h'].indicators.bollinger.middle.toLocaleString()}, Lower $${timeframes['1h'].indicators.bollinger.lower.toLocaleString()} (${timeframes['1h'].indicators.bollinger.trend})
+- EMA 20: $${timeframes['1h'].indicators.ema20.toLocaleString()}
+- EMA 50: $${timeframes['1h'].indicators.ema50.toLocaleString()}
+- EMA Trend: ${timeframes['1h'].indicators.emaTrend}
+- Support Levels: [${timeframes['1h'].indicators.support.map(s => '$' + s.toLocaleString()).join(', ')}]
+- Resistance Levels: [${timeframes['1h'].indicators.resistance.map(r => '$' + r.toLocaleString()).join(', ')}]
+- Recent Candles (OHLCV): ${timeframes['1h'].price.recentOHLCV.slice(-3).map(c => 
+    `[O:$${c.open.toLocaleString()}, H:$${c.high.toLocaleString()}, L:$${c.low.toLocaleString()}, C:$${c.close.toLocaleString()}, V:${c.volume.toFixed(0)}]`
+  ).join(', ')}
+
+MARKET CONDITIONS:
+- 24h Volume: ${market.volume24h.toFixed(0)}
+- Volume Trend: ${market.volumeTrend}
+- Average Volume: ${market.averageVolume.toFixed(0)}
+- Funding Rate: ${(market.fundingRate * 100).toFixed(3)}%
 
 INSTRUCTIONS:
-1. Analyze ONLY the technical indicators provided above
-2. Determine if this is a LONG or SHORT opportunity
-3. Set appropriate entry price based on current market structure
-4. Calculate stop loss using technical levels (support/resistance, Bollinger Bands, etc.)
-5. Determine risk-reward ratio (target profit / stop loss risk)
-6. Provide confidence level (0-100%) based on technical signal strength
-7. Give 4-5 specific technical reasons for the trade
+1. Perform MULTI-TIMEFRAME ANALYSIS: Compare 4h and 1h timeframes for trend alignment
+2. Analyze indicator TRENDS (rising/falling/flat) not just current values
+3. Consider recent CANDLESTICK PATTERNS from the OHLCV data
+4. Use VOLUME ANALYSIS to confirm price movements
+5. Identify the STRONGEST technical setup with highest probability
+6. Set entry price based on current market structure and recent price action
+7. Use MULTIPLE support/resistance levels for precise stop loss placement
+8. Provide confidence level (75-95%) based on timeframe alignment and signal strength
+9. Give 5-6 specific technical reasons focusing on trend alignment and momentum
 
-IMPORTANT: 
-- Base your analysis ONLY on technical indicators, price action, and chart patterns
-- Do NOT consider fundamental analysis, news, or market sentiment
-- Focus on derivatives trading principles (leverage, funding rates, etc.)
-- Ensure risk-reward ratio is at least 1.5:1
+IMPORTANT:
+- HIGHER CONFIDENCE when 4h and 1h timeframes align (same direction)
+- LOWER CONFIDENCE when timeframes conflict or indicators are mixed
+- Use TREND analysis (rising/falling RSI, MACD trend, Bollinger expansion/contraction)
+- Consider VOLUME CONFIRMATION (above average volume = higher confidence)
+- Focus on RECENT PRICE ACTION from candlestick data
+- Ensure risk-reward ratio is at least 2:1 for high-confidence trades
 
 Respond ONLY with a valid JSON object in this exact format:
 {
   "direction": "long",
-  "entry": 118500,
-  "stopLoss": 117000,
-  "riskReward": 2.5,
-  "confidence": 75,
+  "entry": 119000,
+  "stopLoss": 117500,
+  "riskReward": 3.0,
+  "confidence": 85,
   "technicalReasoning": [
-    "RSI showing oversold conditions at 28, indicating potential reversal",
-    "Price bouncing off lower Bollinger Band support",
-    "MACD histogram showing bullish divergence",
-    "EMA 20 acting as dynamic support level",
-    "Volume spike confirms buying interest at current levels"
+    "4h and 1h RSI both showing rising trend, indicating strengthening momentum",
+    "4h MACD histogram trend rising while 1h MACD confirms bullish crossover",
+    "Price action showing higher lows pattern in recent 1h candles",
+    "Volume significantly above average confirming institutional interest",
+    "4h EMA trend bullish with price above both EMAs, 1h alignment confirms",
+    "Multiple support levels provide strong risk management at current entry"
   ],
-  "timeframe": "4-12 hours"
+  "timeframe": "6-24 hours"
 }
 
-Ensure all prices are realistic numbers without commas, direction is "long" or "short", confidence is 0-100, riskReward is a decimal (e.g., 2.5), and technicalReasoning has 4-5 items.`;
+Ensure all prices are realistic numbers without commas, direction is "long" or "short", confidence is 75-95 for high-quality setups, riskReward is a decimal (e.g., 3.0), and technicalReasoning has 5-6 items focusing on multi-timeframe analysis.`;
 }
 
-function parseDerivativesTradeResponse(text: string, marketData: DerivativesMarketData): DerivativesTradeIdea | null {
+function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivativesMarketData): DerivativesTradeIdea | null {
   try {
     // Clean the response text to extract JSON
     let jsonText = text.trim();
@@ -394,15 +422,15 @@ function parseDerivativesTradeResponse(text: string, marketData: DerivativesMark
     // Validate and sanitize the trade idea
     const tradeIdea: DerivativesTradeIdea = {
       direction: ['long', 'short'].includes(tradeData.direction) ? tradeData.direction : 'long',
-      entry: Math.max(0, Math.round(tradeData.entry || marketData.technicalIndicators.currentPrice)),
-      stopLoss: Math.max(0, Math.round(tradeData.stopLoss || marketData.technicalIndicators.currentPrice * 0.95)),
+      entry: Math.max(0, Math.round(tradeData.entry || marketData.timeframes['1h'].indicators.currentPrice)),
+      stopLoss: Math.max(0, Math.round(tradeData.stopLoss || marketData.timeframes['1h'].indicators.currentPrice * 0.95)),
       riskReward: Math.max(1, Math.round((tradeData.riskReward || 2) * 10) / 10),
-      confidence: Math.max(0, Math.min(100, Math.round(tradeData.confidence || 50))),
+      confidence: Math.max(75, Math.min(95, Math.round(tradeData.confidence || 80))),
       technicalReasoning: Array.isArray(tradeData.technicalReasoning) ? 
-        tradeData.technicalReasoning.slice(0, 5) : 
-        ['Technical analysis completed based on current market conditions'],
+        tradeData.technicalReasoning.slice(0, 6) : 
+        ['Multi-timeframe technical analysis completed based on current market conditions'],
       symbol: marketData.symbol,
-      timeframe: tradeData.timeframe || '4-12 hours'
+      timeframe: tradeData.timeframe || '6-24 hours'
     };
     
     console.log(`✅ Parsed derivatives trade idea: ${tradeIdea.direction.toUpperCase()} ${tradeIdea.symbol} at $${tradeIdea.entry}`);

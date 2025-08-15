@@ -16,7 +16,7 @@ import { generateGeminiRecommendations } from './geminiService.js';
 import { getMarketConditions } from '../src/services/tradingService.js';
 import { commands } from './commands.js';
 import { fetchCoinDeskNews, testCoinDeskAPI } from './newsService.js';
-import { getDerivativesMarketData, testBinanceFuturesAPI } from './derivativesDataService.js';
+import { getEnhancedDerivativesMarketData, testBinanceFuturesAPI } from './derivativesDataService.js';
 import { generateDerivativesTradeIdea, DerivativesTradeIdea } from './geminiService.js';
 
 // Load environment variables
@@ -408,14 +408,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
       
       // Show initial loading message
-      await interaction.editReply(`🔄 **Analyzing ${symbol} derivatives market...**\n*Fetching candlestick data and calculating technical indicators*`);
+      await interaction.editReply(`🔄 **Analyzing ${symbol} multi-timeframe market data...**\n*Fetching 4h and 1h candlestick data and calculating enhanced technical indicators*`);
       
       try {
         // Fetch comprehensive market data
-        const marketData = await getDerivativesMarketData(symbol);
+        const marketData = await getEnhancedDerivativesMarketData(symbol);
         
         // Update loading message
-        await interaction.editReply(`🤖 **Generating AI trade idea for ${symbol}...**\n*This may take a moment while I analyze the technical indicators*`);
+        await interaction.editReply(`🤖 **Generating enhanced AI trade idea for ${symbol}...**\n*Analyzing multi-timeframe technical indicators and recent price action*`);
         
         // Generate trade idea using Gemini
         const tradeIdea = await generateDerivativesTradeIdea(marketData);
@@ -426,7 +426,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
         
         // Update with success message
-        await interaction.editReply(`✅ **Generated AI derivatives trade idea for ${symbol}!**`);
+        await interaction.editReply(`✅ **Generated enhanced multi-timeframe trade idea for ${symbol}!**\n*Confidence: ${tradeIdea.confidence}% • Direction: ${tradeIdea.direction.toUpperCase()}*`);
         
         // Send the trade idea as an embed
         const tradeEmbed = createDerivativesTradeEmbed(tradeIdea, marketData);
@@ -633,7 +633,7 @@ function createDerivativesTradeEmbed(tradeIdea: DerivativesTradeIdea, marketData
   const embed = new EmbedBuilder()
     .setColor(directionColor)
     .setTitle(`${directionEmoji} ${tradeIdea.direction.toUpperCase()} ${tradeIdea.symbol}`)
-    .setDescription(`**Derivatives Trade Idea** • ${tradeIdea.confidence}% Confidence`)
+    .setDescription(`**Multi-Timeframe Trade Idea** • ${tradeIdea.confidence}% Confidence`)
     .addFields(
       { 
         name: '🎯 Entry Price', 
@@ -662,17 +662,22 @@ function createDerivativesTradeEmbed(tradeIdea: DerivativesTradeIdea, marketData
       },
       { 
         name: '📊 Current Price', 
-        value: `$${marketData.technicalIndicators.currentPrice.toLocaleString()}`, 
+        value: `$${marketData.timeframes['1h'].indicators.currentPrice.toLocaleString()}`, 
         inline: true 
       },
       { 
-        name: '🔍 Technical Analysis', 
+        name: '🔍 Multi-Timeframe Analysis', 
         value: tradeIdea.technicalReasoning.map(reason => `• ${reason}`).join('\n'), 
         inline: false 
+      },
+      {
+        name: '📈 Timeframe Alignment',
+        value: `4h RSI: ${marketData.timeframes['4h'].indicators.rsi.toFixed(1)} (${marketData.timeframes['4h'].indicators.rsiTrend})\n1h RSI: ${marketData.timeframes['1h'].indicators.rsi.toFixed(1)} (${marketData.timeframes['1h'].indicators.rsiTrend})\nVolume: ${marketData.market.volumeTrend}`,
+        inline: false
       }
     )
     .setTimestamp()
-    .setFooter({ text: 'CryptoTrader Bot • Derivatives Technical Analysis • Not Financial Advice' });
+    .setFooter({ text: 'CryptoTrader Bot • Multi-Timeframe Technical Analysis • Not Financial Advice' });
 
   return embed;
 }
