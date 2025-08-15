@@ -442,7 +442,7 @@ function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivat
     
     // Find the JSON object bounds
     const startIndex = jsonText.indexOf('{');
-    const lastIndex = jsonText.lastIndexOf(\'}');
+    const lastIndex = jsonText.lastIndexOf('}');
     
     if (startIndex === -1 || lastIndex === -1 || startIndex >= lastIndex) {
       throw new Error('No valid JSON object found in response');
