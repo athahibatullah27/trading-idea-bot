@@ -902,14 +902,17 @@ client.on(Events.MessageCreate, async (message) => {
               `💰 **${crypto.name} (${symbol})**\n` +
               `**Price:** $${crypto.price.toLocaleString()}\n` +
               `**24h Change:** ${changeColor} ${crypto.change24h > 0 ? '+' : ''}${crypto.change24h.toFixed(2)}% ${changeEmoji}`
-            await interaction.editReply('⚠️ **No news articles available at the moment. Please try again later.**');
+            );
+          } else {
+            throw new Error('No price data available');
           }
         } catch (error) {
           await loadingMsg.edit(`❌ **Could not fetch ${symbol} price. Please try again later.**`);
-          await interaction.editReply('⚠️ **News service temporarily unavailable. Please try again later.**');
+        }
+      } else {
         await message.channel.send('💡 **Usage:** `!price btc` or `!price eth` etc.');
-        return;
       }
+      return;
     }
 
     // Crypto analysis command (e.g., !btc, !eth, !sol) - This block was moved above
