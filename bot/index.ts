@@ -4,20 +4,15 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import axios from 'axios';
-import { 
-  mockCryptoData, 
-  mockNews, 
-  mockMarketConditions,
-  mockGeopoliticalFactors 
-} from '../src/data/mockData.js';
 import { TradingRecommendation, CryptoData, NewsItem } from '../src/types/trading.js';
 import { getRealTimeCryptoData, getMultipleCryptoData, testAPIConnection } from './tradingview.js';
 import { generateGeminiRecommendations } from './geminiService.js';
-import { getMarketConditions } from '../src/services/tradingService.js';
 import { commands } from './commands.js';
 import { fetchCoinDeskNews, testCoinDeskAPI } from './newsService.js';
 import { getEnhancedDerivativesMarketData, testBinanceFuturesAPI } from './derivativesDataService.js';
 import { generateDerivativesTradeIdea, DerivativesTradeIdea } from './geminiService.js';
+import { supabase } from './supabaseClient.js';
+import { storeTradeRecommendation, evaluatePendingRecommendations, getEvaluationStats } from './evaluationService.js';
 
 // Load environment variables
 dotenv.config();
@@ -116,6 +111,14 @@ app.get('/api/gemini-recommendations', async (req, res) => {
       });
     }
     
+    // Store recommendations in Supabase with current prices as entry prices
+    console.log('💾 Storing recommendations in Supabase...');
+    for (const recommendation of recommendations) {
+      const cryptoData = await getRealTimeCryptoData(recommendation.crypto);
+      const entryPrice = cryptoData?.price || recommendation.targetPrice;
+      await storeTradeRecommendation(recommendation, entryPrice);
+    }
+    
     console.log(`✅ Successfully generated ${recommendations.length} Gemini recommendations`);
     res.json(recommendations);
     
@@ -125,6 +128,60 @@ app.get('/api/gemini-recommendations', async (req, res) => {
       error: 'AI analysis service encountered an error. Please try again later.',
       userMessage: 'We encountered an issue while analyzing the market. Please try again in a few minutes.'
     });
+  }
+});
+
+// API endpoint for evaluated recommendations
+app.get('/api/evaluated-recommendations', async (req, res) => {
+  try {
+    console.log('📊 Fetching evaluated recommendations from Supabase...');
+    
+    const { data: recommendations, error } = await supabase
+      .from('trade_recommendations')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50); // Limit to last 50 recommendations
+
+    if (error) {
+      console.error('❌ Error fetching recommendations:', error.message);
+      return res.status(500).json({ error: 'Failed to fetch recommendations' });
+    }
+
+    // Transform data to match frontend expectations
+    const transformedRecommendations = recommendations.map(rec => ({
+      id: rec.id,
+      crypto: rec.symbol,
+      action: rec.action,
+      confidence: rec.confidence,
+      targetPrice: parseFloat(rec.target_price),
+      stopLoss: parseFloat(rec.stop_loss),
+      reasoning: rec.reasoning,
+      timeframe: rec.timeframe,
+      riskLevel: rec.risk_level,
+      status: rec.status,
+      entryPrice: rec.entry_price ? parseFloat(rec.entry_price) : null,
+      evaluationTimestamp: rec.evaluation_timestamp,
+      createdAt: rec.created_at
+    }));
+
+    console.log(`✅ Successfully fetched ${transformedRecommendations.length} recommendations`);
+    res.json(transformedRecommendations);
+    
+  } catch (error) {
+    console.error('❌ Error fetching evaluated recommendations:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// API endpoint for evaluation statistics
+app.get('/api/evaluation-stats', async (req, res) => {
+  try {
+    console.log('📈 Fetching evaluation statistics...');
+    const stats = await getEvaluationStats();
+    res.json(stats);
+  } catch (error) {
+    console.error('❌ Error fetching evaluation stats:', error);
+    res.status(500).json({ error: 'Failed to fetch statistics' });
   }
 });
 
@@ -177,6 +234,28 @@ client.once(Events.ClientReady, (readyClient) => {
       console.log('⚠️ Binance Futures API is not available');
     }
   });
+  
+  // Test Supabase connection on startup
+  supabase.from('trade_recommendations').select('count', { count: 'exact', head: true }).then(({ error, count }) => {
+    if (error) {
+      console.log('⚠️ Supabase connection failed:', error.message);
+    } else {
+      console.log(`✅ Supabase connected successfully. Found ${count || 0} trade recommendations.`);
+    }
+  });
+  
+  // Start evaluation scheduler (every 4 hours)
+  console.log('⏰ Starting trade recommendation evaluation scheduler (every 4 hours)...');
+  
+  // Run initial evaluation after 1 minute
+  setTimeout(() => {
+    evaluatePendingRecommendations();
+  }, 60000);
+  
+  // Then run every 4 hours
+  setInterval(() => {
+    evaluatePendingRecommendations();
+  }, 4 * 60 * 60 * 1000); // 4 hours in milliseconds
   
   // Set bot status
   client.user?.setActivity('crypto markets 📈', { type: 3 }); // 3 = Watching
@@ -296,15 +375,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       } catch (error) {
         console.error(`Error fetching real-time data for ${symbol}:`, error);
         
-        // Fallback to mock data
-        const crypto = mockCryptoData.find(c => c.symbol === symbol);
-        if (crypto) {
-          await interaction.editReply(`⚠️ **Using cached ${symbol} data due to API limitations.**`);
-          const cryptoEmbed = createCryptoAnalysisEmbed(crypto);
-          await interaction.followUp({ content: '', embeds: [cryptoEmbed] });
-        } else {
-          await interaction.editReply(`❌ **Sorry, I don't have data for ${symbol} yet.**`);
-        }
+        await interaction.editReply(`❌ **Sorry, could not fetch ${symbol} data. Please try again later.**`);
       }
       return;
     }
@@ -490,7 +561,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
 });
 
 // Helper function to create market overview embed
-function createMarketOverviewEmbed(marketConditions = mockMarketConditions) {
+function createMarketOverviewEmbed() {
+  // Create a simple market overview with basic info
+  const marketConditions = {
+    overall: 'neutral',
+    volatility: 'medium',
+    fearGreedIndex: 50,
+    dominance: { btc: 45, eth: 18 }
+  };
+  
   const embed = new EmbedBuilder()
     .setColor(marketConditions.overall === 'bullish' ? 0x00ff00 : 
              marketConditions.overall === 'bearish' ? 0xff0000 : 0xffff00)
@@ -624,7 +703,16 @@ function createRecommendationEmbed(recommendation: TradingRecommendation) {
 
 // Helper function to create news embed
 function createNewsEmbed(newsData?: NewsItem[]) {
-  const newsToDisplay = newsData || mockNews.slice(0, 5);
+  if (!newsData || newsData.length === 0) {
+    return new EmbedBuilder()
+      .setColor(0x3b82f6)
+      .setTitle('📰 Crypto News')
+      .setDescription('No news articles available at the moment')
+      .setTimestamp()
+      .setFooter({ text: 'CryptoTrader Bot • News Service' });
+  }
+  
+  const newsToDisplay = newsData;
   const isRealTime = !!newsData;
   
   const embed = new EmbedBuilder()
@@ -779,15 +867,7 @@ client.on(Events.MessageCreate, async (message) => {
       } catch (error) {
         console.error(`Error fetching real-time data for ${symbol}:`, error);
         
-        // Fallback to mock data
-        const crypto = mockCryptoData.find(c => c.symbol === symbol);
-        if (crypto) {
-          await loadingMsg.edit(`⚠️ **Using cached ${symbol} data due to API limitations.**`);
-          const cryptoEmbed = createCryptoAnalysisEmbed(crypto);
-          await message.channel.send({ embeds: [cryptoEmbed] });
-        } else {
-          await loadingMsg.edit(`❌ **Sorry, I don't have data for ${symbol} yet.**`);
-        }
+        await loadingMsg.edit(`❌ **Sorry, could not fetch ${symbol} data. Please try again later.**`);
       }
       return;
     }
@@ -822,15 +902,11 @@ client.on(Events.MessageCreate, async (message) => {
               `💰 **${crypto.name} (${symbol})**\n` +
               `**Price:** $${crypto.price.toLocaleString()}\n` +
               `**24h Change:** ${changeColor} ${crypto.change24h > 0 ? '+' : ''}${crypto.change24h.toFixed(2)}% ${changeEmoji}`
-            );
-          } else {
-            throw new Error('No price data available');
+            await interaction.editReply('⚠️ **No news articles available at the moment. Please try again later.**');
           }
         } catch (error) {
           await loadingMsg.edit(`❌ **Could not fetch ${symbol} price. Please try again later.**`);
-        }
-        return;
-      } else {
+          await interaction.editReply('⚠️ **News service temporarily unavailable. Please try again later.**');
         await message.channel.send('💡 **Usage:** `!price btc` or `!price eth` etc.');
         return;
       }
@@ -840,14 +916,8 @@ client.on(Events.MessageCreate, async (message) => {
     const cryptoMatch2 = content.match(/!(btc|eth|sol|ada)/);
     if (cryptoMatch2) {
       const symbol = cryptoMatch2[1].toUpperCase();
-      const crypto = mockCryptoData.find(c => c.symbol === symbol);
       
-      if (crypto) {
-        const cryptoEmbed = createCryptoAnalysisEmbed(crypto);
-        await message.channel.send({ embeds: [cryptoEmbed] });
-      } else {
-        await message.channel.send(`❌ Sorry, I don't have data for ${symbol} yet.`);
-      }
+      await message.channel.send(`💡 **Please use the slash command instead:** \`/crypto ${symbol.toLowerCase()}\` for better performance and real-time data.`);
       return;
     }
 
@@ -864,15 +934,11 @@ client.on(Events.MessageCreate, async (message) => {
           const newsEmbed = createNewsEmbed(realTimeNews);
           await message.channel.send({ embeds: [newsEmbed] });
         } else {
-          await loadingMsg.edit('⚠️ **Using cached news due to API limitations.**');
-          const newsEmbed = createNewsEmbed();
-          await message.channel.send({ embeds: [newsEmbed] });
+          await loadingMsg.edit('⚠️ **No news articles available at the moment. Please try again later.**');
         }
       } catch (error) {
         console.error('Error fetching real-time news for !news command:', error);
-        await loadingMsg.edit('⚠️ **Using cached news due to API error.**');
-        const newsEmbed = createNewsEmbed();
-        await message.channel.send({ embeds: [newsEmbed] });
+        await loadingMsg.edit('⚠️ **News service temporarily unavailable. Please try again later.**');
       }
       return;
     }

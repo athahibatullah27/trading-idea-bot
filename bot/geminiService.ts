@@ -50,7 +50,7 @@ export async function generateGeminiRecommendations(
     
     console.log('✅ Received response from Gemini API');
     
-    // Parse the JSON response
+      undefined   // No market conditions needed
     const recommendations = parseGeminiResponse(text, cryptoData);
     
     if (recommendations.length === 0) {
