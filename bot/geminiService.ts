@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { CryptoData, NewsItem, MarketConditions, TradingRecommendation } from '../src/types/trading.js';
+import { DerivativesMarketData } from './derivativesDataService.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -7,6 +8,17 @@ dotenv.config();
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+
+export interface DerivativesTradeIdea {
+  direction: 'long' | 'short';
+  entry: number;
+  stopLoss: number;
+  riskReward: number;
+  confidence: number;
+  technicalReasoning: string[];
+  symbol: string;
+  timeframe: string;
+}
 
 export async function generateGeminiRecommendations(
   cryptoData: CryptoData[],
@@ -251,5 +263,154 @@ function parseGeminiResponse(text: string, cryptoData: CryptoData[]): TradingRec
     }
     
     return [];
+  }
+}
+
+export async function generateDerivativesTradeIdea(
+  marketData: DerivativesMarketData
+): Promise<DerivativesTradeIdea | null> {
+  try {
+    console.log(`🤖 Generating derivatives trade idea for ${marketData.symbol} using Gemini...`);
+    
+    if (!process.env.GEMINI_API_KEY) {
+      console.error('❌ GEMINI_API_KEY is not configured');
+      return null;
+    }
+
+    // Construct the prompt for derivatives trade analysis
+    const prompt = buildDerivativesTradePrompt(marketData);
+    
+    console.log('📝 Sending derivatives trade prompt to Gemini API...');
+    
+    // Generate content using Gemini
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+    
+    console.log('✅ Received derivatives trade response from Gemini API');
+    
+    // Parse the JSON response
+    const tradeIdea = parseDerivativesTradeResponse(text, marketData);
+    
+    if (!tradeIdea) {
+      console.error('❌ Failed to parse valid trade idea from Gemini');
+      return null;
+    }
+    
+    console.log(`🎯 Generated derivatives trade idea: ${tradeIdea.direction.toUpperCase()} ${tradeIdea.symbol}`);
+    return tradeIdea;
+    
+  } catch (error) {
+    console.error('❌ Error generating derivatives trade idea:', error.message);
+    return null;
+  }
+}
+
+function buildDerivativesTradePrompt(marketData: DerivativesMarketData): string {
+  const { symbol, technicalIndicators, marketInfo } = marketData;
+  
+  return `You are an expert derivatives trader specializing in technical analysis. Based on the following technical data for ${symbol}, provide a trade idea using ONLY technical analysis.
+
+TECHNICAL DATA FOR ${symbol}:
+- Current Price: $${technicalIndicators.currentPrice.toLocaleString()}
+- 24h Price Change: ${technicalIndicators.priceChange24h.toFixed(2)}%
+- RSI (14): ${technicalIndicators.rsi.toFixed(1)}
+- MACD: ${technicalIndicators.macd.macd.toFixed(2)} (Signal: ${technicalIndicators.macd.signal.toFixed(2)}, Histogram: ${technicalIndicators.macd.histogram.toFixed(2)})
+- Bollinger Bands: Upper $${technicalIndicators.bollinger.upper.toLocaleString()}, Middle $${technicalIndicators.bollinger.middle.toLocaleString()}, Lower $${technicalIndicators.bollinger.lower.toLocaleString()}
+- EMA 20: $${technicalIndicators.ema20.toLocaleString()}
+- EMA 50: $${technicalIndicators.ema50.toLocaleString()}
+- Support Level: $${technicalIndicators.support.toLocaleString()}
+- Resistance Level: $${technicalIndicators.resistance.toLocaleString()}
+- 24h Volume: ${technicalIndicators.volume24h.toFixed(0)}
+- Funding Rate: ${(marketInfo.fundingRate || 0) * 100}%
+- Mark Price: $${(marketInfo.markPrice || technicalIndicators.currentPrice).toLocaleString()}
+
+INSTRUCTIONS:
+1. Analyze ONLY the technical indicators provided above
+2. Determine if this is a LONG or SHORT opportunity
+3. Set appropriate entry price based on current market structure
+4. Calculate stop loss using technical levels (support/resistance, Bollinger Bands, etc.)
+5. Determine risk-reward ratio (target profit / stop loss risk)
+6. Provide confidence level (0-100%) based on technical signal strength
+7. Give 4-5 specific technical reasons for the trade
+
+IMPORTANT: 
+- Base your analysis ONLY on technical indicators, price action, and chart patterns
+- Do NOT consider fundamental analysis, news, or market sentiment
+- Focus on derivatives trading principles (leverage, funding rates, etc.)
+- Ensure risk-reward ratio is at least 1.5:1
+
+Respond ONLY with a valid JSON object in this exact format:
+{
+  "direction": "long",
+  "entry": 118500,
+  "stopLoss": 117000,
+  "riskReward": 2.5,
+  "confidence": 75,
+  "technicalReasoning": [
+    "RSI showing oversold conditions at 28, indicating potential reversal",
+    "Price bouncing off lower Bollinger Band support",
+    "MACD histogram showing bullish divergence",
+    "EMA 20 acting as dynamic support level",
+    "Volume spike confirms buying interest at current levels"
+  ],
+  "timeframe": "4-12 hours"
+}
+
+Ensure all prices are realistic numbers without commas, direction is "long" or "short", confidence is 0-100, riskReward is a decimal (e.g., 2.5), and technicalReasoning has 4-5 items.`;
+}
+
+function parseDerivativesTradeResponse(text: string, marketData: DerivativesMarketData): DerivativesTradeIdea | null {
+  try {
+    // Clean the response text to extract JSON
+    let jsonText = text.trim();
+    
+    // Remove markdown code blocks if present
+    if (jsonText.startsWith('```json')) {
+      jsonText = jsonText.replace(/```json\n?/, '').replace(/\n?```$/, '');
+    } else if (jsonText.startsWith('```')) {
+      jsonText = jsonText.replace(/```\n?/, '').replace(/\n?```$/, '');
+    }
+    
+    // Additional cleaning for potential formatting issues
+    jsonText = jsonText.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+    
+    // Find the JSON object bounds
+    const startIndex = jsonText.indexOf('{');
+    const lastIndex = jsonText.lastIndexOf('}');
+    
+    if (startIndex === -1 || lastIndex === -1 || startIndex >= lastIndex) {
+      throw new Error('No valid JSON object found in response');
+    }
+    
+    // Extract only the JSON object part
+    jsonText = jsonText.substring(startIndex, lastIndex + 1);
+    
+    console.log('🔍 Cleaned JSON for parsing:', jsonText.substring(0, 200) + '...');
+    
+    // Parse the JSON
+    const tradeData = JSON.parse(jsonText);
+    
+    // Validate and sanitize the trade idea
+    const tradeIdea: DerivativesTradeIdea = {
+      direction: ['long', 'short'].includes(tradeData.direction) ? tradeData.direction : 'long',
+      entry: Math.max(0, Math.round(tradeData.entry || marketData.technicalIndicators.currentPrice)),
+      stopLoss: Math.max(0, Math.round(tradeData.stopLoss || marketData.technicalIndicators.currentPrice * 0.95)),
+      riskReward: Math.max(1, Math.round((tradeData.riskReward || 2) * 10) / 10),
+      confidence: Math.max(0, Math.min(100, Math.round(tradeData.confidence || 50))),
+      technicalReasoning: Array.isArray(tradeData.technicalReasoning) ? 
+        tradeData.technicalReasoning.slice(0, 5) : 
+        ['Technical analysis completed based on current market conditions'],
+      symbol: marketData.symbol,
+      timeframe: tradeData.timeframe || '4-12 hours'
+    };
+    
+    console.log(`✅ Parsed derivatives trade idea: ${tradeIdea.direction.toUpperCase()} ${tradeIdea.symbol} at $${tradeIdea.entry}`);
+    return tradeIdea;
+    
+  } catch (error) {
+    console.error('❌ Error parsing derivatives trade response:', error.message);
+    console.log('📄 Raw response (first 500 chars):', text.substring(0, 500) + '...');
+    return null;
   }
 }

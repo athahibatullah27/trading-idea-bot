@@ -72,6 +72,7 @@ The bot uses Discord slash commands for better user experience:
 - `/price [symbol]` - Get quick price information for any crypto
 - `/news` - Latest crypto news with sentiment analysis
 - `/test` - Test API connectivity and bot status
+- `/derivativetrade [symbol]` - Get AI-powered derivatives trade idea based on technical analysis
 - `/help` - Show available commands and usage
 
 ### Setting Up Slash Commands
@@ -101,6 +102,12 @@ DISCORD_GUILD_ID=your_server_guild_id_for_testing
 - Target prices and stop losses
 - Risk level assessment
 - Detailed reasoning
+
+### Derivatives Trading
+- Technical analysis on futures contracts
+- Entry, stop loss, and risk/reward calculations
+- Long/short recommendations with confidence scores
+- Based on RSI, MACD, Bollinger Bands, and support/resistance levels
 
 ### News & Sentiment
 - Latest crypto news aggregation

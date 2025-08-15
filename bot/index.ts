@@ -16,6 +16,8 @@ import { generateGeminiRecommendations } from './geminiService.js';
 import { getMarketConditions } from '../src/services/tradingService.js';
 import { commands } from './commands.js';
 import { fetchCoinDeskNews, testCoinDeskAPI } from './newsService.js';
+import { getDerivativesMarketData, testBinanceFuturesAPI } from './derivativesDataService.js';
+import { generateDerivativesTradeIdea, DerivativesTradeIdea } from './geminiService.js';
 
 // Load environment variables
 dotenv.config();
@@ -164,6 +166,15 @@ client.once(Events.ClientReady, (readyClient) => {
       console.log('📰 CryptoCompare News API is working');
     } else {
       console.log('⚠️ CryptoCompare News API is not available, using fallback news');
+    }
+  });
+  
+  // Test Binance Futures API on startup
+  testBinanceFuturesAPI().then(isConnected => {
+    if (isConnected) {
+      console.log('📊 Binance Futures API is working');
+    } else {
+      console.log('⚠️ Binance Futures API is not available');
     }
   });
   
@@ -389,6 +400,50 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return;
     }
     
+    if (interaction.commandName === 'derivativetrade') {
+      const symbol = interaction.options.getString('symbol')?.toUpperCase();
+      if (!symbol) {
+        await interaction.editReply('❌ Please provide a valid derivatives symbol.');
+        return;
+      }
+      
+      // Show initial loading message
+      await interaction.editReply(`🔄 **Analyzing ${symbol} derivatives market...**\n*Fetching candlestick data and calculating technical indicators*`);
+      
+      try {
+        // Fetch comprehensive market data
+        const marketData = await getDerivativesMarketData(symbol);
+        
+        // Update loading message
+        await interaction.editReply(`🤖 **Generating AI trade idea for ${symbol}...**\n*This may take a moment while I analyze the technical indicators*`);
+        
+        // Generate trade idea using Gemini
+        const tradeIdea = await generateDerivativesTradeIdea(marketData);
+        
+        if (!tradeIdea) {
+          await interaction.editReply(`❌ **Unable to generate trade idea for ${symbol}**\n*AI analysis service may be temporarily unavailable. Please try again in a few minutes.*`);
+          return;
+        }
+        
+        // Update with success message
+        await interaction.editReply(`✅ **Generated AI derivatives trade idea for ${symbol}!**`);
+        
+        // Send the trade idea as an embed
+        const tradeEmbed = createDerivativesTradeEmbed(tradeIdea, marketData);
+        await interaction.followUp({ embeds: [tradeEmbed] });
+        
+      } catch (error: any) {
+        console.error('Derivatives trade error:', error.message);
+        
+        if (error.message.includes('Invalid symbol')) {
+          await interaction.editReply(`❌ **Invalid symbol: ${symbol}**\n*Please make sure the symbol exists on Binance Futures (e.g., BTCUSDT, ETHUSDT)*`);
+        } else {
+          await interaction.editReply(`❌ **Error analyzing ${symbol}**\n*Unable to fetch market data or generate trade idea. Please try again later.*`);
+        }
+      }
+      return;
+    }
+    
   } catch (error) {
     console.error('Error handling slash command:', error);
     try {
@@ -560,6 +615,64 @@ function createNewsEmbed(newsData?: NewsItem[]) {
       inline: false
     });
   });
+
+  return embed;
+}
+
+// Helper function to create derivatives trade idea embed
+function createDerivativesTradeEmbed(tradeIdea: DerivativesTradeIdea, marketData: any) {
+  const directionEmoji = tradeIdea.direction === 'long' ? '🟢📈' : '🔴📉';
+  const directionColor = tradeIdea.direction === 'long' ? 0x00ff00 : 0xff0000;
+  
+  // Calculate target price based on risk-reward ratio
+  const riskAmount = Math.abs(tradeIdea.entry - tradeIdea.stopLoss);
+  const targetPrice = tradeIdea.direction === 'long' ? 
+    tradeIdea.entry + (riskAmount * tradeIdea.riskReward) :
+    tradeIdea.entry - (riskAmount * tradeIdea.riskReward);
+  
+  const embed = new EmbedBuilder()
+    .setColor(directionColor)
+    .setTitle(`${directionEmoji} ${tradeIdea.direction.toUpperCase()} ${tradeIdea.symbol}`)
+    .setDescription(`**Derivatives Trade Idea** • ${tradeIdea.confidence}% Confidence`)
+    .addFields(
+      { 
+        name: '🎯 Entry Price', 
+        value: `$${tradeIdea.entry.toLocaleString()}`, 
+        inline: true 
+      },
+      { 
+        name: '🛡️ Stop Loss', 
+        value: `$${tradeIdea.stopLoss.toLocaleString()}`, 
+        inline: true 
+      },
+      { 
+        name: '💰 Target Price', 
+        value: `$${targetPrice.toLocaleString()}`, 
+        inline: true 
+      },
+      { 
+        name: '⚖️ Risk/Reward Ratio', 
+        value: `1:${tradeIdea.riskReward}`, 
+        inline: true 
+      },
+      { 
+        name: '⏰ Timeframe', 
+        value: tradeIdea.timeframe, 
+        inline: true 
+      },
+      { 
+        name: '📊 Current Price', 
+        value: `$${marketData.technicalIndicators.currentPrice.toLocaleString()}`, 
+        inline: true 
+      },
+      { 
+        name: '🔍 Technical Analysis', 
+        value: tradeIdea.technicalReasoning.map(reason => `• ${reason}`).join('\n'), 
+        inline: false 
+      }
+    )
+    .setTimestamp()
+    .setFooter({ text: 'CryptoTrader Bot • Derivatives Technical Analysis • Not Financial Advice' });
 
   return embed;
 }
