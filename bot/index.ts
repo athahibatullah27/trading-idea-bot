@@ -496,6 +496,43 @@ client.on(Events.InteractionCreate, async (interaction) => {
           return;
         }
         
+        // Store valid trade ideas in Supabase (skip "no trade" recommendations)
+        if (tradeIdea.confidence > 0 && tradeIdea.entry > 0) {
+          try {
+            // Calculate target price based on risk-reward ratio
+            const riskAmount = Math.abs(tradeIdea.entry - tradeIdea.stopLoss);
+            const targetPrice = tradeIdea.direction === 'long' ? 
+              tradeIdea.entry + (riskAmount * tradeIdea.riskReward) :
+              tradeIdea.entry - (riskAmount * tradeIdea.riskReward);
+            
+            // Map DerivativesTradeIdea to TradingRecommendation format
+            const mappedRecommendation: TradingRecommendation = {
+              crypto: tradeIdea.symbol,
+              action: tradeIdea.direction === 'long' ? 'buy' : 'sell',
+              confidence: tradeIdea.confidence,
+              targetPrice: targetPrice,
+              stopLoss: tradeIdea.stopLoss,
+              reasoning: tradeIdea.technicalReasoning,
+              timeframe: tradeIdea.timeframe,
+              riskLevel: 'high' // Derivatives trading typically carries higher risk
+            };
+            
+            // Store in Supabase with entry price
+            const stored = await storeTradeRecommendation(mappedRecommendation, tradeIdea.entry);
+            
+            if (stored) {
+              console.log(`✅ Stored derivatives trade idea for ${symbol} in database`);
+            } else {
+              console.log(`⚠️ Failed to store derivatives trade idea for ${symbol} in database`);
+            }
+          } catch (storeError) {
+            console.error('❌ Error storing derivatives trade idea:', storeError);
+            // Don't fail the command if storage fails, just log the error
+          }
+        } else {
+          console.log(`📝 Skipping storage for ${symbol} - no trade recommendation (confidence: ${tradeIdea.confidence}%)`);
+        }
+        
         // Update with success message
         await interaction.editReply(`✅ **Generated enhanced multi-timeframe trade idea for ${symbol}!**\n*Confidence: ${tradeIdea.confidence}% • Direction: ${tradeIdea.direction.toUpperCase()}*`);
         
