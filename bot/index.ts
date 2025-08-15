@@ -637,17 +637,17 @@ function createDerivativesTradeEmbed(tradeIdea: DerivativesTradeIdea, marketData
     .addFields(
       { 
         name: '🎯 Entry Price', 
-        value: `$${tradeIdea.entry.toLocaleString()}`, 
+        value: `$${tradeIdea.entry.toFixed(5)}`, 
         inline: true 
       },
       { 
         name: '🛡️ Stop Loss', 
-        value: `$${tradeIdea.stopLoss.toLocaleString()}`, 
+        value: `$${tradeIdea.stopLoss.toFixed(5)}`, 
         inline: true 
       },
       { 
         name: '💰 Target Price', 
-        value: `$${targetPrice.toLocaleString()}`, 
+        value: `$${targetPrice.toFixed(5)}`, 
         inline: true 
       },
       { 
@@ -662,7 +662,7 @@ function createDerivativesTradeEmbed(tradeIdea: DerivativesTradeIdea, marketData
       },
       { 
         name: '📊 Current Price', 
-        value: `$${marketData.timeframes['1h'].indicators.currentPrice.toLocaleString()}`, 
+        value: `$${marketData.timeframes['1h'].indicators.currentPrice.toFixed(5)}`, 
         inline: true 
       },
       { 

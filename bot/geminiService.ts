@@ -366,12 +366,13 @@ IMPORTANT:
 - Consider VOLUME CONFIRMATION (above average volume = higher confidence)
 - Focus on RECENT PRICE ACTION from candlestick data
 - Ensure risk-reward ratio is at least 2:1 for high-confidence trades
+- Use HIGH PRECISION for all prices (up to 5 decimal places for accuracy)
 
 Respond ONLY with a valid JSON object in this exact format:
 {
   "direction": "long",
-  "entry": 119000,
-  "stopLoss": 117500,
+  "entry": 119000.50000,
+  "stopLoss": 117500.25000,
   "riskReward": 3.0,
   "confidence": 85,
   "technicalReasoning": [
@@ -385,7 +386,7 @@ Respond ONLY with a valid JSON object in this exact format:
   "timeframe": "6-24 hours"
 }
 
-Ensure all prices are realistic numbers without commas, direction is "long" or "short", confidence is 75-95 for high-quality setups, riskReward is a decimal (e.g., 3.0), and technicalReasoning has 5-6 items focusing on multi-timeframe analysis.`;
+Ensure all prices are realistic numbers with high precision (up to 5 decimal places), direction is "long" or "short", confidence is 75-95 for high-quality setups, riskReward is a decimal (e.g., 3.0), and technicalReasoning has 5-6 items focusing on multi-timeframe analysis.`;
 }
 
 function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivativesMarketData): DerivativesTradeIdea | null {
@@ -422,8 +423,8 @@ function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivat
     // Validate and sanitize the trade idea
     const tradeIdea: DerivativesTradeIdea = {
       direction: ['long', 'short'].includes(tradeData.direction) ? tradeData.direction : 'long',
-      entry: Math.max(0, Math.round(tradeData.entry || marketData.timeframes['1h'].indicators.currentPrice)),
-      stopLoss: Math.max(0, Math.round(tradeData.stopLoss || marketData.timeframes['1h'].indicators.currentPrice * 0.95)),
+      entry: Math.max(0, parseFloat((tradeData.entry || marketData.timeframes['1h'].indicators.currentPrice).toFixed(5))),
+      stopLoss: Math.max(0, parseFloat((tradeData.stopLoss || marketData.timeframes['1h'].indicators.currentPrice * 0.95).toFixed(5))),
       riskReward: Math.max(1, Math.round((tradeData.riskReward || 2) * 10) / 10),
       confidence: Math.max(75, Math.min(95, Math.round(tradeData.confidence || 80))),
       technicalReasoning: Array.isArray(tradeData.technicalReasoning) ? 
@@ -433,7 +434,7 @@ function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivat
       timeframe: tradeData.timeframe || '6-24 hours'
     };
     
-    console.log(`✅ Parsed derivatives trade idea: ${tradeIdea.direction.toUpperCase()} ${tradeIdea.symbol} at $${tradeIdea.entry}`);
+    console.log(`✅ Parsed derivatives trade idea: ${tradeIdea.direction.toUpperCase()} ${tradeIdea.symbol} at $${tradeIdea.entry.toFixed(5)}`);
     return tradeIdea;
     
   } catch (error) {
