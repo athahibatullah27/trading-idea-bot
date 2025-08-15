@@ -309,9 +309,10 @@ export async function generateDerivativesTradeIdea(
 function buildEnhancedDerivativesTradePrompt(marketData: EnhancedDerivativesMarketData): string {
   const { symbol, timeframes, market } = marketData;
   
-  return `{
-  "persona": "You are an expert derivatives trader specializing in multi-timeframe technical analysis, with a primary focus on capital preservation and identifying high-probability setups. Your analysis must be solely based on the provided technical data.",
-  "data": {
+  return `You are an expert derivatives trader specializing in multi-timeframe technical analysis, with a primary focus on capital preservation and identifying high-probability setups. Your analysis must be solely based on the provided technical data.
+
+DATA:
+{
     "symbol": "${symbol}",
     "dataTimestamp": "${marketData.dataTimestamp}",
     "4-HOUR TIMEFRAME ANALYSIS": {
@@ -362,65 +363,66 @@ function buildEnhancedDerivativesTradePrompt(marketData: EnhancedDerivativesMark
       "Average Volume": ${market.averageVolume.toFixed(0)},
       "Funding Rate": ${market.fundingRate.toFixed(3)}
     }
-  },
-  "instructions_for_analysis": [
-    "**<thinking>**",
-    "**Expert Analytical Process:** Apply a systematic, top-down multi-timeframe analysis, prioritizing capital preservation.",
-    "",
-    "**Step 1: Establish Primary Trend (4-Hour Timeframe - Highest Priority):**",
-    " - Analyze the 4-hour EMA trend, MACD trend, and recent OHLCV to determine the dominant market direction (bullish, bearish, or ranging).",
-    " - Identify major 4-hour support and resistance levels. This timeframe provides the foundational context; all subsequent lower timeframe analysis MUST align with this primary trend for a high-confidence trade idea.",
-    " - *Self-assessment:* Is the 4-hour trend direction clear and unambiguous? If not, note the ambiguity as a potential reason for a 'No Trade Idea'.",
-    "",
-    "**Step 2: Confirm Momentum and Setup (1-Hour Timeframe - Secondary Priority):**",
-    " - Analyze the 1-hour EMA trend, MACD, and RSI. Crucially, assess if these indicators and their trends *align* with the established 4-hour trend. Strong alignment across timeframes is paramount for high confidence.",
-    " - Identify key 1-hour support and resistance levels. Observe price action (OHLCV) reacting to or approaching these levels.",
-    " - Evaluate 1-hour RSI trend (rising/falling) and its position relative to overbought (70) and oversold (30) thresholds. A rising RSI from below 30 is a stronger bullish signal than a rising RSI above 70, which may indicate overextension and potential reversal.",
-    " - Analyze 1-hour MACD for bullish/bearish crossovers and the histogram's trend (increasing/decreasing momentum). Confirm if it is reinforcing momentum in the direction of the 4-hour trend.",
-    " - Interpret Bollinger Bands: Are they expanding (increasing volatility) or contracting (decreasing volatility)? Is price breaking out or consolidating within the bands?",
-    " - *Self-assessment:* Do 1-hour signals strongly confirm the 4-hour trend, or are there conflicts? If conflicts exist, prioritize the 4-hour trend. If the conflict is significant and persistent, this may lead to a 'No Trade Idea'.",
-    "",
-    "**Step 3: Candlestick and Volume Confirmation (Both Timeframes):**",
-    " - Examine recent OHLCV data for significant candlestick patterns (e.g., Bullish Engulfing, Hammer, Shooting Star, Bearish Engulfing) specifically at identified key support/resistance levels. Interpret their implications in the context of the established multi-timeframe trend.",
-    " - Analyze the 24h Volume and Volume Trend. Significantly *above average volume* (e.g., 84000 vs 50000) *confirming* price movements (e.g., rising price on rising volume for long setups, falling price on rising volume for short setups) adds the highest confidence to the trade idea. Below average volume or volume divergence from price action indicates lower confidence or potential false signals.",
-    " - *Self-assessment:* Does volume unequivocally confirm price action and the trend? Are identified candlestick patterns strong and positioned at relevant price levels?",
-    "",
-    "**Step 4: Confluence Assessment and Explicit Signal Weighting:**",
-    " - Systematically weigh the strength of each aligned signal. Assign the *highest importance* to Multi-Timeframe Trend Alignment (4h and 1h in same direction) and Volume Confirmation.",
-    " - Assign *medium importance* to strong momentum indicator alignment (RSI trend, MACD crossover/histogram) and price action at key support/resistance levels.",
-    " - Assign *lower importance* to individual candlestick patterns unless they occur at critical support/resistance with strong volume.",
-    " - Identify the strongest technical setup by assessing the overall confluence of aligned, weighted signals. A setup with 3-5 strongly confirming indicators is generally more successful.",
-    " - *Self-assessment:* Is there overwhelming, weighted evidence for a clear directional bias? Or are signals mixed, ambiguous, or lacking sufficient confluence?",
-    "",
-    "**Step 5: Risk Management and Decision Formulation:**",
-    " - Based on the strongest setup and its confluence, determine the optimal entry price. Consider current market structure and recent price action (e.g., a pullback to a key EMA or established support/resistance level).",
-    " - Precisely place the stop-loss using multiple support/resistance levels to ensure robust risk management and minimize potential losses.",
-    " - Calculate the Risk-Reward Ratio. If the calculated ratio is less than 2:1, the trade idea is considered invalid for a high-confidence setup. In such cases, state 'No Trade Idea'.",
-    " - *Self-assessment:* Is the proposed trade idea robust from a risk management perspective? Does it meet the minimum 2:1 risk-reward ratio? Is capital preservation prioritized?",
-    "",
-    "**Step 6: Final Confidence Calibration and Trade Idea Decision:**",
-    " - **If** 4h and 1h timeframes align, AND there is strong confluence of 3+ weighted signals, AND the risk-reward is >= 2:1, **THEN** provide a high-confidence trade idea (75-95%). The confidence score should directly reflect the strength of confluence and alignment.",
-    " - **ELSE IF** timeframes conflict, OR indicators are mixed/ambiguous, OR risk-reward is < 2:1, **THEN** state 'No Trade Idea' and provide detailed explanation for abstention due to lack of a high-probability setup or unfavorable risk. In such cases, the 'confidence' field should be explicitly stated as 'N/A' or below 75%.",
-    " - Formulate 5-6 specific technical reasons in the 'technicalReasoning' array. Prioritize the most impactful and aligned signals, justifying the chosen trade direction and the assigned confidence level.",
-    "**</thinking>**",
-    "",
-    "**<output>**",
-    " - Respond ONLY with a valid JSON object in this exact format:",
-    " \\`{ \\"direction\\": \\"long\\" | \\"short\\" | \\"no_trade_due_to_conflict\\", \\"entry\\": 119000.50000 | 0.0, \\"stopLoss\\": 117500.25000 | 0.0, \\"riskReward\\": 3.0 | 0.0, \\"confidence\\": 85 | \\"N/A\\", \\"technicalReasoning\\": [ \\"reason1\\", \\"reason2\\",... ], \\"timeframe\\": \\"6-24 hours\\" }\\`",
-    " - Ensure all prices are realistic numbers with high precision (up to 5 decimal places).",
-    " - If 'direction' is 'no_trade_due_to_conflict', set 'entry', 'stopLoss', and 'riskReward' to 0.0, and 'confidence' to 'N/A' or below 75%, with 'technicalReasoning' explaining the lack of a clear setup or conflicting signals.",
-    " - 'confidence' must be between 75-95 for high-quality setups. 'riskReward' is a decimal (e.g., 3.0).",
-    " - 'technicalReasoning' must contain 5-6 items, explicitly focusing on multi-timeframe analysis, trend alignment, momentum, and volume confirmation, ordered by their impact on the decision.",
-    "**</output>**"
-  ],
-  "important_notes": [
-    "Use TREND analysis (rising/falling RSI, MACD trend, Bollinger expansion/contraction) with full contextual awareness.",
-    "Consider VOLUME CONFIRMATION (significantly above average volume on trending moves = higher confidence) as a critical validation.",
-    "Focus on RECENT PRICE ACTION from candlestick data, especially reactions at support/resistance.",
-    "Ensure risk-reward ratio is at least 2:1 for all high-confidence trades.",
-    "Maintain HIGH PRECISION for all prices (up to 5 decimal places for accuracy)."
-  ]
-}`;
+}
+
+INSTRUCTIONS FOR ANALYSIS:
+
+**<thinking>**
+**Expert Analytical Process:** Apply a systematic, top-down multi-timeframe analysis, prioritizing capital preservation.
+
+**Step 1: Establish Primary Trend (4-Hour Timeframe - Highest Priority):**
+ - Analyze the 4-hour EMA trend, MACD trend, and recent OHLCV to determine the dominant market direction (bullish, bearish, or ranging).
+ - Identify major 4-hour support and resistance levels. This timeframe provides the foundational context; all subsequent lower timeframe analysis MUST align with this primary trend for a high-confidence trade idea.
+ - *Self-assessment:* Is the 4-hour trend direction clear and unambiguous? If not, note the ambiguity as a potential reason for a 'No Trade Idea'.
+
+**Step 2: Confirm Momentum and Setup (1-Hour Timeframe - Secondary Priority):**
+ - Analyze the 1-hour EMA trend, MACD, and RSI. Crucially, assess if these indicators and their trends *align* with the established 4-hour trend. Strong alignment across timeframes is paramount for high confidence.
+ - Identify key 1-hour support and resistance levels. Observe price action (OHLCV) reacting to or approaching these levels.
+ - Evaluate 1-hour RSI trend (rising/falling) and its position relative to overbought (70) and oversold (30) thresholds. A rising RSI from below 30 is a stronger bullish signal than a rising RSI above 70, which may indicate overextension and potential reversal.
+ - Analyze 1-hour MACD for bullish/bearish crossovers and the histogram's trend (increasing/decreasing momentum). Confirm if it is reinforcing momentum in the direction of the 4-hour trend.
+ - Interpret Bollinger Bands: Are they expanding (increasing volatility) or contracting (decreasing volatility)? Is price breaking out or consolidating within the bands?
+ - *Self-assessment:* Do 1-hour signals strongly confirm the 4-hour trend, or are there conflicts? If conflicts exist, prioritize the 4-hour trend. If the conflict is significant and persistent, this may lead to a 'No Trade Idea'.
+
+**Step 3: Candlestick and Volume Confirmation (Both Timeframes):**
+ - Examine recent OHLCV data for significant candlestick patterns (e.g., Bullish Engulfing, Hammer, Shooting Star, Bearish Engulfing) specifically at identified key support/resistance levels. Interpret their implications in the context of the established multi-timeframe trend.
+ - Analyze the 24h Volume and Volume Trend. Significantly *above average volume* (e.g., 84000 vs 50000) *confirming* price movements (e.g., rising price on rising volume for long setups, falling price on rising volume for short setups) adds the highest confidence to the trade idea. Below average volume or volume divergence from price action indicates lower confidence or potential false signals.
+ - *Self-assessment:* Does volume unequivocally confirm price action and the trend? Are identified candlestick patterns strong and positioned at relevant price levels?
+
+**Step 4: Confluence Assessment and Explicit Signal Weighting:**
+ - Systematically weigh the strength of each aligned signal. Assign the *highest importance* to Multi-Timeframe Trend Alignment (4h and 1h in same direction) and Volume Confirmation.
+ - Assign *medium importance* to strong momentum indicator alignment (RSI trend, MACD crossover/histogram) and price action at key support/resistance levels.
+ - Assign *lower importance* to individual candlestick patterns unless they occur at critical support/resistance with strong volume.
+ - Identify the strongest technical setup by assessing the overall confluence of aligned, weighted signals. A setup with 3-5 strongly confirming indicators is generally more successful.
+ - *Self-assessment:* Is there overwhelming, weighted evidence for a clear directional bias? Or are signals mixed, ambiguous, or lacking sufficient confluence?
+
+**Step 5: Risk Management and Decision Formulation:**
+ - Based on the strongest setup and its confluence, determine the optimal entry price. Consider current market structure and recent price action (e.g., a pullback to a key EMA or established support/resistance level).
+ - Precisely place the stop-loss using multiple support/resistance levels to ensure robust risk management and minimize potential losses.
+ - Calculate the Risk-Reward Ratio. If the calculated ratio is less than 2:1, the trade idea is considered invalid for a high-confidence setup. In such cases, state 'No Trade Idea'.
+ - *Self-assessment:* Is the proposed trade idea robust from a risk management perspective? Does it meet the minimum 2:1 risk-reward ratio? Is capital preservation prioritized?
+
+**Step 6: Final Confidence Calibration and Trade Idea Decision:**
+ - **If** 4h and 1h timeframes align, AND there is strong confluence of 3+ weighted signals, AND the risk-reward is >= 2:1, **THEN** provide a high-confidence trade idea (75-95%). The confidence score should directly reflect the strength of confluence and alignment.
+ - **ELSE IF** timeframes conflict, OR indicators are mixed/ambiguous, OR risk-reward is < 2:1, **THEN** state 'No Trade Idea' and provide detailed explanation for abstention due to lack of a high-probability setup or unfavorable risk. In such cases, the 'confidence' field should be explicitly stated as 'N/A' or below 75%.
+ - Formulate 5-6 specific technical reasons in the 'technicalReasoning' array. Prioritize the most impactful and aligned signals, justifying the chosen trade direction and the assigned confidence level.
+**</thinking>**
+
+IMPORTANT NOTES:
+- Use TREND analysis (rising/falling RSI, MACD trend, Bollinger expansion/contraction) with full contextual awareness.
+- Consider VOLUME CONFIRMATION (significantly above average volume on trending moves = higher confidence) as a critical validation.
+- Focus on RECENT PRICE ACTION from candlestick data, especially reactions at support/resistance.
+- Ensure risk-reward ratio is at least 2:1 for all high-confidence trades.
+- Maintain HIGH PRECISION for all prices (up to 5 decimal places for accuracy).
+
+**<output>**
+Respond ONLY with a valid JSON object in this exact format:
+{ "direction": "long" | "short" | "no_trade_due_to_conflict", "entry": 119000.50000 | 0.0, "stopLoss": 117500.25000 | 0.0, "riskReward": 3.0 | 0.0, "confidence": 85 | "N/A", "technicalReasoning": [ "reason1", "reason2",... ], "timeframe": "6-24 hours" }
+
+- Ensure all prices are realistic numbers with high precision (up to 5 decimal places).
+- If 'direction' is 'no_trade_due_to_conflict', set 'entry', 'stopLoss', and 'riskReward' to 0.0, and 'confidence' to 'N/A' or below 75%, with 'technicalReasoning' explaining the lack of a clear setup or conflicting signals.
+- 'confidence' must be between 75-95 for high-quality setups. 'riskReward' is a decimal (e.g., 3.0).
+- 'technicalReasoning' must contain 5-6 items, explicitly focusing on multi-timeframe analysis, trend alignment, momentum, and volume confirmation, ordered by their impact on the decision.
+**</output>**`;
 }
 
 function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivativesMarketData): DerivativesTradeIdea | null {
@@ -440,7 +442,7 @@ function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivat
     
     // Find the JSON object bounds
     const startIndex = jsonText.indexOf('{');
-    const lastIndex = jsonText.lastIndexOf('}');
+    const lastIndex = jsonText.lastIndexOf(\'}');
     
     if (startIndex === -1 || lastIndex === -1 || startIndex >= lastIndex) {
       throw new Error('No valid JSON object found in response');
@@ -454,7 +456,7 @@ function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivat
     // Parse the JSON
     const tradeData = JSON.parse(jsonText);
     
-    // Handle the new "no_trade_due_to_conflict" direction
+    // Handle the new "no_trade_due_to_c\onflict" direction
     if (tradeData.direction === 'no_trade_due_to_conflict') {
       console.log('⚠️ AI determined no trade due to conflicting signals');
       return {
@@ -492,139 +494,6 @@ function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivat
     };
     
     console.log(`✅ Parsed derivatives trade idea: ${tradeIdea.direction.toUpperCase()} ${tradeIdea.symbol} at $${tradeIdea.entry.toFixed(5)} (Confidence: ${tradeIdea.confidence}%)`);
-    return tradeIdea;
-    
-  } catch (error) {
-    console.error('❌ Error parsing derivatives trade response:', error.message);
-    console.log('📄 Raw response (first 500 chars):', text.substring(0, 500) + '...');
-    return null;
-  }
-}
-
-MULTI-TIMEFRAME TECHNICAL DATA FOR ${symbol}:
-Data Timestamp: ${marketData.dataTimestamp}
-
-4-HOUR TIMEFRAME ANALYSIS:
-- Current Price: $${timeframes['4h'].indicators.currentPrice.toLocaleString()}
-- RSI (14): ${timeframes['4h'].indicators.rsi.toFixed(1)} (${timeframes['4h'].indicators.rsiTrend})
-- MACD: ${timeframes['4h'].indicators.macd.macd.toFixed(2)} (Signal: ${timeframes['4h'].indicators.macd.signal.toFixed(2)}, Histogram: ${timeframes['4h'].indicators.macd.histogram.toFixed(2)}, Trend: ${timeframes['4h'].indicators.macd.trend})
-- Bollinger Bands: Upper $${timeframes['4h'].indicators.bollinger.upper.toLocaleString()}, Middle $${timeframes['4h'].indicators.bollinger.middle.toLocaleString()}, Lower $${timeframes['4h'].indicators.bollinger.lower.toLocaleString()} (${timeframes['4h'].indicators.bollinger.trend})
-- EMA 20: $${timeframes['4h'].indicators.ema20.toLocaleString()}
-- EMA 50: $${timeframes['4h'].indicators.ema50.toLocaleString()}
-- EMA Trend: ${timeframes['4h'].indicators.emaTrend}
-- Support Levels: [${timeframes['4h'].indicators.support.map(s => '$' + s.toLocaleString()).join(', ')}]
-- Resistance Levels: [${timeframes['4h'].indicators.resistance.map(r => '$' + r.toLocaleString()).join(', ')}]
-- Recent Candles (OHLCV): ${timeframes['4h'].price.recentOHLCV.slice(-3).map(c => 
-    `[O:$${c.open.toLocaleString()}, H:$${c.high.toLocaleString()}, L:$${c.low.toLocaleString()}, C:$${c.close.toLocaleString()}, V:${c.volume.toFixed(0)}]`
-  ).join(', ')}
-
-1-HOUR TIMEFRAME ANALYSIS:
-- Current Price: $${timeframes['1h'].indicators.currentPrice.toLocaleString()}
-- RSI (14): ${timeframes['1h'].indicators.rsi.toFixed(1)} (${timeframes['1h'].indicators.rsiTrend})
-- MACD: ${timeframes['1h'].indicators.macd.macd.toFixed(2)} (Signal: ${timeframes['1h'].indicators.macd.signal.toFixed(2)}, Histogram: ${timeframes['1h'].indicators.macd.histogram.toFixed(2)}, Trend: ${timeframes['1h'].indicators.macd.trend})
-- Bollinger Bands: Upper $${timeframes['1h'].indicators.bollinger.upper.toLocaleString()}, Middle $${timeframes['1h'].indicators.bollinger.middle.toLocaleString()}, Lower $${timeframes['1h'].indicators.bollinger.lower.toLocaleString()} (${timeframes['1h'].indicators.bollinger.trend})
-- EMA 20: $${timeframes['1h'].indicators.ema20.toLocaleString()}
-- EMA 50: $${timeframes['1h'].indicators.ema50.toLocaleString()}
-- EMA Trend: ${timeframes['1h'].indicators.emaTrend}
-- Support Levels: [${timeframes['1h'].indicators.support.map(s => '$' + s.toLocaleString()).join(', ')}]
-- Resistance Levels: [${timeframes['1h'].indicators.resistance.map(r => '$' + r.toLocaleString()).join(', ')}]
-- Recent Candles (OHLCV): ${timeframes['1h'].price.recentOHLCV.slice(-3).map(c => 
-    `[O:$${c.open.toLocaleString()}, H:$${c.high.toLocaleString()}, L:$${c.low.toLocaleString()}, C:$${c.close.toLocaleString()}, V:${c.volume.toFixed(0)}]`
-  ).join(', ')}
-
-MARKET CONDITIONS:
-- 24h Volume: ${market.volume24h.toFixed(0)}
-- Volume Trend: ${market.volumeTrend}
-- Average Volume: ${market.averageVolume.toFixed(0)}
-- Funding Rate: ${(market.fundingRate * 100).toFixed(3)}%
-
-INSTRUCTIONS:
-1. Perform MULTI-TIMEFRAME ANALYSIS: Compare 4h and 1h timeframes for trend alignment
-2. Analyze indicator TRENDS (rising/falling/flat) not just current values
-3. Consider recent CANDLESTICK PATTERNS from the OHLCV data
-4. Use VOLUME ANALYSIS to confirm price movements
-5. Identify the STRONGEST technical setup with highest probability
-6. Set entry price based on current market structure and recent price action
-7. Use MULTIPLE support/resistance levels for precise stop loss placement
-8. Provide confidence level (75-95%) based on timeframe alignment and signal strength
-9. Give 5-6 specific technical reasons focusing on trend alignment and momentum
-
-IMPORTANT:
-- HIGHER CONFIDENCE when 4h and 1h timeframes align (same direction)
-- LOWER CONFIDENCE when timeframes conflict or indicators are mixed
-- Use TREND analysis (rising/falling RSI, MACD trend, Bollinger expansion/contraction)
-- Consider VOLUME CONFIRMATION (above average volume = higher confidence)
-- Focus on RECENT PRICE ACTION from candlestick data
-- Ensure risk-reward ratio is at least 2:1 for high-confidence trades
-- Use HIGH PRECISION for all prices (up to 5 decimal places for accuracy)
-
-Respond ONLY with a valid JSON object in this exact format:
-{
-  "direction": "long",
-  "entry": 119000.50000,
-  "stopLoss": 117500.25000,
-  "riskReward": 3.0,
-  "confidence": 85,
-  "technicalReasoning": [
-    "4h and 1h RSI both showing rising trend, indicating strengthening momentum",
-    "4h MACD histogram trend rising while 1h MACD confirms bullish crossover",
-    "Price action showing higher lows pattern in recent 1h candles",
-    "Volume significantly above average confirming institutional interest",
-    "4h EMA trend bullish with price above both EMAs, 1h alignment confirms",
-    "Multiple support levels provide strong risk management at current entry"
-  ],
-  "timeframe": "6-24 hours"
-}
-
-Ensure all prices are realistic numbers with high precision (up to 5 decimal places), direction is "long" or "short", confidence is 75-95 for high-quality setups, riskReward is a decimal (e.g., 3.0), and technicalReasoning has 5-6 items focusing on multi-timeframe analysis.`;
-}
-
-function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivativesMarketData): DerivativesTradeIdea | null {
-  try {
-    // Clean the response text to extract JSON
-    let jsonText = text.trim();
-    
-    // Remove markdown code blocks if present
-    if (jsonText.startsWith('```json')) {
-      jsonText = jsonText.replace(/```json\n?/, '').replace(/\n?```$/, '');
-    } else if (jsonText.startsWith('```')) {
-      jsonText = jsonText.replace(/```\n?/, '').replace(/\n?```$/, '');
-    }
-    
-    // Additional cleaning for potential formatting issues
-    jsonText = jsonText.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-    
-    // Find the JSON object bounds
-    const startIndex = jsonText.indexOf('{');
-    const lastIndex = jsonText.lastIndexOf('}');
-    
-    if (startIndex === -1 || lastIndex === -1 || startIndex >= lastIndex) {
-      throw new Error('No valid JSON object found in response');
-    }
-    
-    // Extract only the JSON object part
-    jsonText = jsonText.substring(startIndex, lastIndex + 1);
-    
-    console.log('🔍 Cleaned JSON for parsing:', jsonText.substring(0, 200) + '...');
-    
-    // Parse the JSON
-    const tradeData = JSON.parse(jsonText);
-    
-    // Validate and sanitize the trade idea
-    const tradeIdea: DerivativesTradeIdea = {
-      direction: ['long', 'short'].includes(tradeData.direction) ? tradeData.direction : 'long',
-      entry: Math.max(0, parseFloat((tradeData.entry || marketData.timeframes['1h'].indicators.currentPrice).toFixed(5))),
-      stopLoss: Math.max(0, parseFloat((tradeData.stopLoss || marketData.timeframes['1h'].indicators.currentPrice * 0.95).toFixed(5))),
-      riskReward: Math.max(1, Math.round((tradeData.riskReward || 2) * 10) / 10),
-      confidence: Math.max(75, Math.min(95, Math.round(tradeData.confidence || 80))),
-      technicalReasoning: Array.isArray(tradeData.technicalReasoning) ? 
-        tradeData.technicalReasoning.slice(0, 6) : 
-        ['Multi-timeframe technical analysis completed based on current market conditions'],
-      symbol: marketData.symbol,
-      timeframe: tradeData.timeframe || '6-24 hours'
-    };
-    
-    console.log(`✅ Parsed derivatives trade idea: ${tradeIdea.direction.toUpperCase()} ${tradeIdea.symbol} at $${tradeIdea.entry.toFixed(5)}`);
     return tradeIdea;
     
   } catch (error) {
