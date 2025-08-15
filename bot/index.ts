@@ -430,7 +430,38 @@ client.on(Events.InteractionCreate, async (interaction) => {
         
         // Send the trade idea as an embed
         const tradeEmbed = createDerivativesTradeEmbed(tradeIdea, marketData);
-        await interaction.followUp({ embeds: [tradeEmbed] });
+        
+        // Check if this is a "no trade" recommendation
+        if (tradeIdea.confidence === 0 || tradeIdea.entry === 0) {
+          // Create a special embed for no trade recommendations
+          const noTradeEmbed = new EmbedBuilder()
+            .setColor(0xffff00) // Yellow for caution
+            .setTitle(`⚠️ NO TRADE RECOMMENDED - ${tradeIdea.symbol}`)
+            .setDescription('**AI Analysis Complete** • No High-Probability Setup Identified')
+            .addFields(
+              { 
+                name: '🔍 Analysis Result', 
+                value: 'Conflicting signals or insufficient confluence detected', 
+                inline: false 
+              },
+              { 
+                name: '🤖 AI Reasoning', 
+                value: tradeIdea.technicalReasoning.map(reason => `• ${reason}`).join('\n'), 
+                inline: false 
+              },
+              {
+                name: '💡 Recommendation',
+                value: 'Wait for clearer market structure and stronger signal alignment before entering a position.',
+                inline: false
+              }
+            )
+            .setTimestamp()
+            .setFooter({ text: 'CryptoTrader Bot • Enhanced Multi-Timeframe Analysis • Capital Preservation Priority' });
+          
+          await interaction.followUp({ embeds: [noTradeEmbed] });
+        } else {
+          await interaction.followUp({ embeds: [tradeEmbed] });
+        }
         
       } catch (error: any) {
         console.error('Derivatives trade error:', error.message);
@@ -621,6 +652,23 @@ function createNewsEmbed(newsData?: NewsItem[]) {
 
 // Helper function to create derivatives trade idea embed
 function createDerivativesTradeEmbed(tradeIdea: DerivativesTradeIdea, marketData: any) {
+  // Handle no-trade scenarios
+  if (tradeIdea.confidence === 0 || tradeIdea.entry === 0) {
+    return new EmbedBuilder()
+      .setColor(0xffff00)
+      .setTitle(`⚠️ NO TRADE - ${tradeIdea.symbol}`)
+      .setDescription('No high-probability setup identified')
+      .addFields(
+        { 
+          name: '🤖 AI Analysis', 
+          value: tradeIdea.technicalReasoning.map(reason => `• ${reason}`).join('\n'), 
+          inline: false 
+        }
+      )
+      .setTimestamp()
+      .setFooter({ text: 'CryptoTrader Bot • Enhanced Analysis • Capital Preservation' });
+  }
+  
   const directionEmoji = tradeIdea.direction === 'long' ? '🟢📈' : '🔴📉';
   const directionColor = tradeIdea.direction === 'long' ? 0x00ff00 : 0xff0000;
   
@@ -633,7 +681,7 @@ function createDerivativesTradeEmbed(tradeIdea: DerivativesTradeIdea, marketData
   const embed = new EmbedBuilder()
     .setColor(directionColor)
     .setTitle(`${directionEmoji} ${tradeIdea.direction.toUpperCase()} ${tradeIdea.symbol}`)
-    .setDescription(`**Multi-Timeframe Trade Idea** • ${tradeIdea.confidence}% Confidence`)
+    .setDescription(`**Enhanced Multi-Timeframe Analysis** • ${tradeIdea.confidence}% Confidence`)
     .addFields(
       { 
         name: '🎯 Entry Price', 
@@ -666,18 +714,18 @@ function createDerivativesTradeEmbed(tradeIdea: DerivativesTradeIdea, marketData
         inline: true 
       },
       { 
-        name: '🔍 Multi-Timeframe Analysis', 
+        name: '🔍 Enhanced Technical Analysis', 
         value: tradeIdea.technicalReasoning.map(reason => `• ${reason}`).join('\n'), 
         inline: false 
       },
       {
-        name: '📈 Timeframe Alignment',
+        name: '📈 Multi-Timeframe Confluence',
         value: `4h RSI: ${marketData.timeframes['4h'].indicators.rsi.toFixed(1)} (${marketData.timeframes['4h'].indicators.rsiTrend})\n1h RSI: ${marketData.timeframes['1h'].indicators.rsi.toFixed(1)} (${marketData.timeframes['1h'].indicators.rsiTrend})\nVolume: ${marketData.market.volumeTrend}`,
         inline: false
       }
     )
     .setTimestamp()
-    .setFooter({ text: 'CryptoTrader Bot • Multi-Timeframe Technical Analysis • Not Financial Advice' });
+    .setFooter({ text: 'CryptoTrader Bot • Enhanced Multi-Timeframe Analysis • Capital Preservation Priority • Not Financial Advice' });
 
   return embed;
 }
