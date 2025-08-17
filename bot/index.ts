@@ -243,22 +243,67 @@ client.once(Events.ClientReady, (readyClient) => {
     }
   });
   
-  // Start evaluation scheduler (every 4 hours)
-  console.log('⏰ Starting trade recommendation evaluation scheduler (every 4 hours)...');
-  
-  // Run initial evaluation after 1 minute
-  setTimeout(() => {
-    evaluatePendingRecommendations();
-  }, 60000);
-  
-  // Then run every 4 hours
-  setInterval(() => {
-    evaluatePendingRecommendations();
-  }, 4 * 60 * 60 * 1000); // 4 hours in milliseconds
+  // Start evaluation scheduler at specific UTC hours (03:00, 07:00, 11:00, 15:00, 19:00, 23:00)
+  console.log('⏰ Starting trade recommendation evaluation scheduler at specific UTC hours...');
+  scheduleEvaluationAtSpecificHours();
   
   // Set bot status
   client.user?.setActivity('crypto markets 📈', { type: 3 }); // 3 = Watching
 });
+
+// Function to calculate milliseconds until next evaluation time
+function calculateNextEvaluationDelay(): number {
+  const now = new Date();
+  const currentUTCHour = now.getUTCHours();
+  const currentUTCMinute = now.getUTCMinutes();
+  const currentUTCSecond = now.getUTCSeconds();
+  
+  // Target evaluation hours in UTC
+  const evaluationHours = [3, 7, 11, 15, 19, 23];
+  
+  // Find the next evaluation hour
+  let nextHour = evaluationHours.find(hour => hour > currentUTCHour);
+  
+  // If no hour found today, use the first hour of tomorrow
+  if (!nextHour) {
+    nextHour = evaluationHours[0]; // 03:00 UTC next day
+  }
+  
+  // Calculate target time
+  const targetTime = new Date(now);
+  targetTime.setUTCHours(nextHour, 0, 0, 0); // Set to target hour, 0 minutes, 0 seconds, 0 milliseconds
+  
+  // If target time is in the past (shouldn't happen with our logic, but safety check)
+  if (targetTime <= now) {
+    targetTime.setUTCDate(targetTime.getUTCDate() + 1);
+  }
+  
+  const delayMs = targetTime.getTime() - now.getTime();
+  
+  console.log(`📅 Current UTC time: ${now.toISOString()}`);
+  console.log(`🎯 Next evaluation scheduled for: ${targetTime.toISOString()}`);
+  console.log(`⏱️ Delay until next evaluation: ${Math.round(delayMs / 1000 / 60)} minutes`);
+  
+  return delayMs;
+}
+
+// Function to schedule evaluations at specific UTC hours
+function scheduleEvaluationAtSpecificHours(): void {
+  const initialDelay = calculateNextEvaluationDelay();
+  
+  // Schedule the first evaluation
+  setTimeout(() => {
+    console.log('🔍 Running scheduled evaluation at UTC hour...');
+    evaluatePendingRecommendations();
+    
+    // After the first evaluation, set up recurring evaluations every 4 hours
+    setInterval(() => {
+      console.log('🔍 Running scheduled evaluation (4-hour interval)...');
+      evaluatePendingRecommendations();
+    }, 4 * 60 * 60 * 1000); // 4 hours in milliseconds
+    
+  }, initialDelay);
+}
 
 // Function to register slash commands
 async function registerSlashCommands() {

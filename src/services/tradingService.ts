@@ -1,7 +1,9 @@
 import { TradingRecommendation } from '../types/trading';
 
-// API proxy base URL (your Discord bot's proxy server)
-const API_PROXY_BASE = 'http://localhost:3001/api';
+// API proxy base URL - use environment variable with production default
+const API_PROXY_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
+
+console.log('🌐 Frontend: Using API base URL:', API_PROXY_BASE);
 
 // Core functions for trade recommendation evaluation system
 

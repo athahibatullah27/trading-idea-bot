@@ -128,6 +128,15 @@ The project consists of two main parts:
 1. **React Dashboard** (`src/`) - Web interface for viewing analysis
 2. **Discord Bot** (`bot/`) - Discord integration and commands
 
+### Environment Variables
+
+For the frontend dashboard to work properly, you need to configure the API base URL:
+
+1. Copy `.env.example` to `.env.local`
+2. Update `VITE_API_BASE_URL` to point to your backend:
+   - For local development: `http://localhost:3001/api`
+   - For production: `https://your-deployed-backend.com/api`
+
 ### File Structure
 
 ```
