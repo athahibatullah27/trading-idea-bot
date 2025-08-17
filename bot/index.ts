@@ -5,6 +5,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import axios from 'axios';
 import { TradingRecommendation, CryptoData, NewsItem } from '../src/types/trading.js';
+import { TradingRecommendation, CryptoData, NewsItem } from './types.js';
 import { getRealTimeCryptoData, getMultipleCryptoData, testAPIConnection } from './tradingview.js';
 import { generateGeminiRecommendations } from './geminiService.js';
 import { commands } from './commands.js';
@@ -88,20 +89,19 @@ app.get('/api/gemini-recommendations', async (req, res) => {
     
     // Fetch real-time news from CoinDesk
     console.log('📰 Fetching real-time news from CryptoCompare...');
-    const realTimeNews = await fetchCoinDeskNews(5);
-    const newsToUse = realTimeNews.length > 0 ? realTimeNews : mockNews.slice(0, 3);
+    const realTimeNews = await fetchCoinDeskNews(5); 
     
     if (realTimeNews.length > 0) {
       console.log(`✅ Using ${realTimeNews.length} real-time news articles from CryptoCompare`);
     } else {
-      console.log('⚠️ CryptoCompare API unavailable, using fallback mock news');
+      console.log('⚠️ CryptoCompare API unavailable, proceeding without news data');
     }
     
     // Generate recommendations using Gemini
     const recommendations = await generateGeminiRecommendations(
       cryptoData,
-      newsToUse, // Include real-time or fallback news
-      mockMarketConditions   // Include market conditions
+      realTimeNews.length > 0 ? realTimeNews : undefined, // Include real-time news only if available
+      undefined   // No market conditions (removed mock data)
     );
     
     if (recommendations.length === 0) {

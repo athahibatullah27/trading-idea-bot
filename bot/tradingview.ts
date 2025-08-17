@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { CryptoData } from '../src/types/trading.js';
+import { CryptoData } from './types.js';
 
 // TradingView API endpoints
 const TRADINGVIEW_API_BASE = 'https://scanner.tradingview.com';

@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { CryptoData, NewsItem, MarketConditions, TradingRecommendation } from '../src/types/trading.js';
+import { CryptoData, NewsItem, MarketConditions, TradingRecommendation } from './types.js';
 import { EnhancedDerivativesMarketData } from './derivativesDataService.js';
 import dotenv from 'dotenv';
 

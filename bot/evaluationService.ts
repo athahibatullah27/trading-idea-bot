@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient.js';
 import { getRealTimeCryptoData } from './tradingview.js';
-import { TradingRecommendation } from '../src/types/trading.js';
+import { TradingRecommendation } from './types.js';
 
 export interface StoredTradeRecommendation extends TradingRecommendation {
   id: string;
