@@ -10,7 +10,10 @@
     "preview": "vite preview",
     "bot": "tsx bot/index.ts",
     "dev:all": "concurrently --kill-others \"npm run dev\" \"npm run bot\"",
-    "start:bot": "node --loader tsx/esm bot/index.ts"
+    "start:bot": "node --loader tsx/esm bot/index.ts",
+    "build:bot": "tsc -p tsconfig.bot.json",
+    "docker:build": "docker build -t my-bolt-backend .",
+    "docker:run": "docker run -d -p 3001:3001 --name bolt-backend-container my-bolt-backend"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
