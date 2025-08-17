@@ -9,7 +9,8 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install all dependencies (including devDependencies for building)
-RUN npm ci
+# Use --no-audit and --no-fund to reduce memory usage and speed up install
+RUN npm ci --no-audit --no-fund --prefer-offline
 
 # Copy the rest of the application code
 COPY . .
@@ -18,7 +19,7 @@ COPY . .
 RUN npm run build:bot
 
 # Remove devDependencies to reduce image size
-RUN npm prune --production
+RUN npm prune --production --no-audit
 
 # Create a non-root user for security
 RUN addgroup -g 1001 -S nodejs

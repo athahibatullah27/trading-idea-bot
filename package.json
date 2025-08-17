@@ -12,8 +12,13 @@
     "dev:all": "concurrently --kill-others \"npm run dev\" \"npm run bot\"",
     "start:bot": "node --loader tsx/esm bot/index.ts",
     "build:bot": "tsc -p tsconfig.bot.json",
-    "docker:build": "docker build -t my-bolt-backend .",
-    "docker:run": "docker run -d -p 3001:3001 --name bolt-backend-container my-bolt-backend"
+    "docker:build": "docker build -t trade-bot-backend .",
+    "docker:run": "docker run -d -p 3001:3001 --name trade-bot-backend-container trade-bot-backend",
+    "compose:up": "docker compose up -d",
+    "compose:down": "docker compose down",
+    "compose:logs": "docker compose logs -f backend",
+    "compose:restart": "docker compose restart backend",
+    "compose:build": "docker compose build"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
