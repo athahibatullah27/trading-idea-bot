@@ -19,7 +19,19 @@ dotenv.config();
 
 // Create Express server for API proxy
 const app = express();
-app.use(cors());
+
+// Configure CORS properly
+app.use(cors({
+  origin: [
+    'https://inquisitive-gumdrop-7cbbda.netlify.app',
+    'http://localhost:5173',
+    'http://localhost:3000'
+  ],
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  credentials: false
+}));
+
 app.use(express.json());
 
 // API endpoint for crypto data
