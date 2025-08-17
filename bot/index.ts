@@ -347,8 +347,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
     
     if (interaction.commandName === 'market') {
-      const marketEmbed = createMarketOverviewEmbed();
-      await interaction.editReply({ content: '', embeds: [marketEmbed] });
+      await interaction.editReply('🔄 **Fetching real-time market data...**');
+      
+      try {
+        const marketEmbed = await createMarketOverviewEmbed();
+        await interaction.editReply('✅ **Market overview ready!**');
+        await interaction.followUp({ embeds: [marketEmbed] });
+      } catch (error) {
+        console.error('Error fetching market overview:', error);
+        await interaction.editReply('❌ **Unable to fetch market data at the moment. Please try again later.**');
+      }
       return;
     }
     
@@ -598,51 +606,95 @@ client.on(Events.InteractionCreate, async (interaction) => {
 });
 
 // Helper function to create market overview embed
-function createMarketOverviewEmbed() {
-  // Create a simple market overview with basic info
-  const marketConditions = {
-    overall: 'neutral',
-    volatility: 'medium',
-    fearGreedIndex: 50,
-    dominance: { btc: 45, eth: 18 }
-  };
+async function createMarketOverviewEmbed() {
+  try {
+    console.log('📊 Fetching real-time market data for overview...');
+    
+    // Fetch real-time data for major cryptocurrencies
+    const majorCryptos = ['BTC', 'ETH', 'SOL', 'ADA', 'BNB'];
+    const cryptoData = await getMultipleCryptoData(majorCryptos);
+    
+    if (cryptoData.length === 0) {
+      throw new Error('No market data available');
+    }
+    
+    // Calculate aggregate metrics
+    const totalMarketCap = cryptoData.reduce((sum, crypto) => sum + crypto.marketCap, 0);
+    const totalVolume = cryptoData.reduce((sum, crypto) => sum + crypto.volume, 0);
+    const avgChange24h = cryptoData.reduce((sum, crypto) => sum + crypto.change24h, 0) / cryptoData.length;
+    
+    // Determine overall market sentiment based on average change
+    const overallSentiment = avgChange24h > 2 ? 'Bullish 🟢' : 
+                            avgChange24h < -2 ? 'Bearish 🔴' : 'Neutral 🟡';
+    
+    const embed = new EmbedBuilder()
+      .setColor(avgChange24h > 0 ? 0x00ff00 : avgChange24h < 0 ? 0xff0000 : 0xffff00)
+      .setTitle('📊 Live Market Overview')
+      .setDescription(`Real-time data from ${cryptoData.length} major cryptocurrencies`)
+      .addFields(
+        { 
+          name: '📈 Market Sentiment', 
+          value: overallSentiment, 
+          inline: true 
+        },
+        { 
+          name: '📊 Avg 24h Change', 
+          value: `${avgChange24h > 0 ? '+' : ''}${avgChange24h.toFixed(2)}%`, 
+          inline: true 
+        },
+        { 
+          name: '💰 Total Market Cap', 
+          value: `$${(totalMarketCap / 1e12).toFixed(2)}T`, 
+          inline: true 
+        },
+        { 
+          name: '📈 24h Volume', 
+          value: `$${(totalVolume / 1e9).toFixed(1)}B`, 
+          inline: true 
+        },
+        {
+          name: '🏆 Top Performers',
+          value: cryptoData
+            .sort((a, b) => b.change24h - a.change24h)
+            .slice(0, 3)
+            .map(crypto => `${crypto.symbol}: ${crypto.change24h > 0 ? '+' : ''}${crypto.change24h.toFixed(2)}%`)
+            .join('\n'),
+          inline: true
+        },
+        {
+          name: '📉 Underperformers',
+          value: cryptoData
+            .sort((a, b) => a.change24h - b.change24h)
+            .slice(0, 3)
+            .map(crypto => `${crypto.symbol}: ${crypto.change24h > 0 ? '+' : ''}${crypto.change24h.toFixed(2)}%`)
+            .join('\n'),
+          inline: true
+        }
+      )
+      .setTimestamp()
+      .setFooter({ text: 'CryptoTrader Bot • Live Market Data' });
   
-  const embed = new EmbedBuilder()
-    .setColor(marketConditions.overall === 'bullish' ? 0x00ff00 : 
-             marketConditions.overall === 'bearish' ? 0xff0000 : 0xffff00)
-    .setTitle('📊 Market Overview')
-    .setDescription('Current crypto market conditions')
-    .addFields(
-      { 
-        name: '📈 Market Sentiment', 
-        value: `${marketConditions.overall.toUpperCase()}`, 
-        inline: true 
-      },
-      { 
-        name: '⚡ Volatility', 
-        value: `${marketConditions.volatility.toUpperCase()}`, 
-        inline: true 
-      },
-      { 
-        name: '😱 Fear & Greed Index', 
-        value: `${marketConditions.fearGreedIndex}/100`, 
-        inline: true 
-      },
-      { 
-        name: '₿ BTC Dominance', 
-        value: `${marketConditions.dominance.btc}%`, 
-        inline: true 
-      },
-      { 
-        name: '⟠ ETH Dominance', 
-        value: `${marketConditions.dominance.eth}%`, 
-        inline: true 
-      }
-    )
-    .setTimestamp()
-    .setFooter({ text: 'CryptoTrader Bot • Market data updated' });
 
-  return embed;
+    return embed;
+    
+  } catch (error) {
+    console.error('Error creating market overview:', error);
+    
+    // Return error embed
+    return new EmbedBuilder()
+      .setColor(0xff0000)
+      .setTitle('❌ Market Data Unavailable')
+      .setDescription('Unable to fetch real-time market data at the moment')
+      .addFields(
+        { 
+          name: '🔄 Try Again', 
+          value: 'Market data services may be temporarily unavailable', 
+          inline: false 
+        }
+      )
+      .setTimestamp()
+      .setFooter({ text: 'CryptoTrader Bot • Error State' });
+  }
 }
 
 // Helper function to create crypto analysis embed
@@ -864,7 +916,7 @@ client.on(Events.MessageCreate, async (message) => {
 
   try {
     // Hello command for #testing-hub channel
-    if (content === '!hello' && message.channel.name === 'testing-hub') {
+    if (content === '!hello' && 'name' in message.channel && message.channel.name === 'testing-hub') {
       await message.channel.send('Hello too');
       return;
     }
@@ -884,7 +936,7 @@ client.on(Events.MessageCreate, async (message) => {
     }
 
     // Crypto analysis command (e.g., !btc, !eth, !sol)
-    const cryptoMatch = content.match(/!(btc|eth|sol|ada)/);
+    const cryptoMatch = content.match(/!(btc|eth|sol|ada)/) as RegExpMatchArray | null;
     if (cryptoMatch) {
       const symbol = cryptoMatch[1].toUpperCase();
       
@@ -970,55 +1022,20 @@ client.on(Events.MessageCreate, async (message) => {
         const realTimeNews = await fetchCoinDeskNews(5); // Limit to 5 articles for Discord embed
         
         if (realTimeNews.length > 0) {
-          await loadingMsg.edit(`✅ **Found ${realTimeNews.length} latest crypto news articles!**`);
+          await loadingMsg.edit(`✅ **Found ${realTimeNews.length} latest news articles!**`);
           const newsEmbed = createNewsEmbed(realTimeNews);
           await message.channel.send({ embeds: [newsEmbed] });
         } else {
-          await loadingMsg.edit('⚠️ **No news articles available at the moment. Please try again later.**');
+          await loadingMsg.edit('❌ **No news articles available at the moment.**\n*News service may be temporarily unavailable. Please try again later.*');
         }
       } catch (error) {
         console.error('Error fetching real-time news for !news command:', error);
-        await loadingMsg.edit('⚠️ **News service temporarily unavailable. Please try again later.**');
+        await loadingMsg.edit('❌ **News service is currently unavailable.**\n*Please try again in a few minutes.*');
       }
       return;
     }
 
     // Help command
-    if (content.includes('!help') || content.includes('!commands')) {
-      const helpEmbed = new EmbedBuilder()
-        .setColor(0x3b82f6)
-        .setTitle('🤖 CryptoTrader Bot Commands')
-        .setDescription('Available commands for crypto trading analysis')
-        .addFields(
-          { name: '!tradingidea', value: 'Get AI-powered trading recommendations', inline: false },
-          { name: '!market', value: 'View current market overview', inline: false },
-          { name: '!btc, !eth, !sol, !ada', value: 'Get technical analysis for specific crypto', inline: false },
-          { name: '!price [crypto]', value: 'Get quick price for any crypto (e.g., !price btc)', inline: false },
-          { name: '!news', value: 'Latest crypto news with sentiment analysis', inline: false },
-          { name: '!test', value: 'Test API connectivity', inline: false },
-          { name: '!help', value: 'Show this help message', inline: false }
-        )
-        .setTimestamp()
-        .setFooter({ text: 'CryptoTrader Bot • AI-Powered Trading Analysis' });
-
-      await message.channel.send({ embeds: [helpEmbed] });
-      return;
-    }
-
-    // Greeting responses
-    if (content.includes('hello') || content.includes('hi') || content.includes('hey')) {
-      await message.channel.send('👋 Hello! I\'m your AI crypto trading assistant. Type `!help` to see available commands or `!tradingidea` for today\'s recommendations!');
-      return;
-    }
-
-  } catch (error) {
-    console.error('Error handling message:', error);
-    await message.channel.send('❌ Sorry, I encountered an error processing your request. Please try again.');
-  }
-});
-
-// Error handling
-client.on(Events.Error, (error) => {
   console.error('Discord client error:', error);
 });
 

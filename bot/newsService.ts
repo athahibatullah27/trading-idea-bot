@@ -162,13 +162,13 @@ export async function fetchCoinDeskNews(limit: number = 10): Promise<NewsItem[]>
       
       // Convert lowercase fields to uppercase for consistency
       articles = rawArticles.map((item: any) => ({
-        ID: item.id || item.ID,
-        TITLE: item.title || item.TITLE,
+        ID: item.id || item.ID || 0,
+        TITLE: item.title || item.TITLE || '',
         BODY: item.body || item.BODY || '',
-        PUBLISHED_ON: item.published_on || item.PUBLISHED_ON,
-        URL: item.url || item.URL,
+        PUBLISHED_ON: item.published_on || item.PUBLISHED_ON || Date.now() / 1000,
+        URL: item.url || item.URL || '',
         SOURCE_DATA: item.source_data || item.SOURCE_DATA || { name: 'CryptoCompare' },
-        SENTIMENT: item.sentiment || item.SENTIMENT
+        SENTIMENT: item.sentiment || item.SENTIMENT || ''
       }));
       
       console.log(`✅ Successfully fetched ${articles.length} articles from CryptoCompare`);
