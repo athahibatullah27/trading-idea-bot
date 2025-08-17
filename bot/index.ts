@@ -930,7 +930,7 @@ client.on(Events.MessageCreate, async (message) => {
 
     // Market analysis command
     if (content.includes('!market') || content.includes('market analysis')) {
-      const marketEmbed = createMarketOverviewEmbed();
+      const marketEmbed = await createMarketOverviewEmbed();
       await message.channel.send({ embeds: [marketEmbed] });
       return;
     }
@@ -1022,20 +1022,49 @@ client.on(Events.MessageCreate, async (message) => {
         const realTimeNews = await fetchCoinDeskNews(5); // Limit to 5 articles for Discord embed
         
         if (realTimeNews.length > 0) {
-          await loadingMsg.edit(`✅ **Found ${realTimeNews.length} latest news articles!**`);
+          await loadingMsg.edit(`✅ **Found ${realTimeNews.length} latest crypto news articles!**`);
           const newsEmbed = createNewsEmbed(realTimeNews);
           await message.channel.send({ embeds: [newsEmbed] });
         } else {
-          await loadingMsg.edit('❌ **No news articles available at the moment.**\n*News service may be temporarily unavailable. Please try again later.*');
+          await loadingMsg.edit('⚠️ **No news articles available at the moment. Please try again later.**');
         }
       } catch (error) {
         console.error('Error fetching real-time news for !news command:', error);
-        await loadingMsg.edit('❌ **News service is currently unavailable.**\n*Please try again in a few minutes.*');
+        await loadingMsg.edit('⚠️ **News service temporarily unavailable. Please try again later.**');
       }
       return;
     }
 
     // Help command
+    if (content.includes('!help') || content.includes('help')) {
+      const helpEmbed = new EmbedBuilder()
+        .setColor(0x3b82f6)
+        .setTitle('🤖 CryptoTrader Bot Commands')
+        .setDescription('Available commands for crypto trading analysis')
+        .addFields(
+          { name: '!tradingidea', value: 'Get AI-powered trading recommendations', inline: false },
+          { name: '!market', value: 'View current market overview', inline: false },
+          { name: '!btc, !eth, !sol, !ada', value: 'Get technical analysis for specific crypto', inline: false },
+          { name: '!price [symbol]', value: 'Get quick price for any crypto', inline: false },
+          { name: '!news', value: 'Latest crypto news with sentiment analysis', inline: false },
+          { name: '!test', value: 'Test API connectivity', inline: false },
+          { name: '!help', value: 'Show this help message', inline: false }
+        )
+        .setTimestamp()
+        .setFooter({ text: 'CryptoTrader Bot • AI-Powered Trading Analysis' });
+
+      await message.channel.send({ embeds: [helpEmbed] });
+      return;
+    }
+
+  } catch (error) {
+    console.error('Error handling message:', error);
+    await message.channel.send('❌ Sorry, I encountered an error processing your request. Please try again.');
+  }
+});
+
+// Error handling
+client.on(Events.Error, (error) => {
   console.error('Discord client error:', error);
 });
 
