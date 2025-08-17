@@ -173,10 +173,10 @@ export async function fetchCoinDeskNews(limit: number = 10): Promise<NewsItem[]>
       
       console.log(`✅ Successfully fetched ${articles.length} articles from CryptoCompare`);
       console.log(`📊 Sample article fields:`, {
-        ID: rawArticles[0]?.id || rawArticles[0]?.ID,
-        TITLE: (rawArticles[0]?.title || rawArticles[0]?.TITLE)?.substring(0, 50) + '...',
-        PUBLISHED_ON: rawArticles[0]?.published_on || rawArticles[0]?.PUBLISHED_ON,
-        SENTIMENT: rawArticles[0]?.sentiment || rawArticles[0]?.SENTIMENT
+        ID: rawArticles[0]?.ID || rawArticles[0]?.ID,
+        TITLE: (rawArticles[0]?.TITLE || rawArticles[0]?.TITLE)?.substring(0, 50) + '...',
+        PUBLISHED_ON: rawArticles[0]?.PUBLISHED_ON || rawArticles[0]?.PUBLISHED_ON,
+        SENTIMENT: rawArticles[0]?.SENTIMENT || rawArticles[0]?.SENTIMENT
       });
     } else {
       console.error('❌ CryptoCompare API returned invalid structure:', response.data);
