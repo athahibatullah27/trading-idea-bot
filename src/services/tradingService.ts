@@ -13,12 +13,16 @@ export async function getEvaluatedRecommendationsFromAPI(): Promise<TradingRecom
     console.log('📊 Frontend: Requesting evaluated recommendations via proxy...');
     console.log(`🌐 Frontend: Connecting to ${API_PROXY_BASE}/evaluated-recommendations`);
     
+    // For self-signed certificates, we need to handle the request differently
     const response = await fetch(`${API_PROXY_BASE}/evaluated-recommendations`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
-      signal: AbortSignal.timeout(15000) // 15 second timeout
+      signal: AbortSignal.timeout(15000), // 15 second timeout
+      mode: 'cors', // Enable CORS
+      credentials: 'omit' // Don't send credentials
     });
     
     if (!response.ok) {
@@ -68,8 +72,11 @@ export async function getEvaluationStatsFromAPI(): Promise<{
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
-      signal: AbortSignal.timeout(10000) // 10 second timeout
+      signal: AbortSignal.timeout(10000), // 10 second timeout
+      mode: 'cors', // Enable CORS
+      credentials: 'omit' // Don't send credentials
     });
     
     if (!response.ok) {
