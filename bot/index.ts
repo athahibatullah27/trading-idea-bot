@@ -4,7 +4,6 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import axios from 'axios';
-import { TradingRecommendation, CryptoData, NewsItem } from '../src/types/trading.js';
 import { TradingRecommendation, CryptoData, NewsItem } from './types.js';
 import { getRealTimeCryptoData, getMultipleCryptoData, testAPIConnection } from './tradingview.js';
 import { generateGeminiRecommendations } from './geminiService.js';

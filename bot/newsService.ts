@@ -162,21 +162,21 @@ export async function fetchCoinDeskNews(limit: number = 10): Promise<NewsItem[]>
       
       // Convert lowercase fields to uppercase for consistency
       articles = rawArticles.map((item: any) => ({
-        ID: item.ID || item.id || 0,
-        TITLE: item.TITLE || item.title || '',
-        BODY: item.BODY || item.body || '',
-        PUBLISHED_ON: item.PUBLISHED_ON || item.published_on || Date.now() / 1000,
-        URL: item.URL || item.url || '',
-        SOURCE_DATA: item.SOURCE_DATA || item.source_data || { name: 'CryptoCompare' },
-        SENTIMENT: item.SENTIMENT || item.sentiment || ''
+        ID: item.id || item.ID || 0,
+        TITLE: item.title || item.TITLE || '',
+        BODY: item.body || item.BODY || '',
+        PUBLISHED_ON: item.published_on || item.PUBLISHED_ON || Date.now() / 1000,
+        URL: item.url || item.URL || '',
+        SOURCE_DATA: item.source_data || item.SOURCE_DATA || { name: 'CryptoCompare' },
+        SENTIMENT: item.sentiment || item.SENTIMENT || ''
       }));
       
       console.log(`✅ Successfully fetched ${articles.length} articles from CryptoCompare`);
       console.log(`📊 Sample article fields:`, {
-        id: rawArticles[0]?.ID || rawArticles[0]?.id,
-        title: (rawArticles[0]?.TITLE || rawArticles[0]?.title)?.substring(0, 50) + '...',
-        published_on: rawArticles[0]?.PUBLISHED_ON || rawArticles[0]?.published_on,
-        sentiment: rawArticles[0]?.SENTIMENT || rawArticles[0]?.sentiment
+        id: rawArticles[0]?.id || rawArticles[0]?.ID,
+        title: (rawArticles[0]?.title || rawArticles[0]?.TITLE)?.substring(0, 50) + '...',
+        published_on: rawArticles[0]?.published_on || rawArticles[0]?.PUBLISHED_ON,
+        sentiment: rawArticles[0]?.sentiment || rawArticles[0]?.SENTIMENT
       });
     } else {
       console.error('❌ CryptoCompare API returned invalid structure:', response.data);
