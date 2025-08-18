@@ -13,7 +13,7 @@
     "start:bot": "node --loader tsx/esm bot/index.ts",
     "build:bot": "tsc -p tsconfig.bot.json",
     "docker:build": "docker build -t trade-bot-backend .",
-    "docker:run": "docker run -d -p 3001:3001 --name trade-bot-backend-container trade-bot-backend",
+    "docker:run": "docker run -d --name crypto-bot-container -p 3001:3001 --env-file .env.backend --restart unless-stopped trade-bot-backend",
     "compose:up": "docker compose up -d",
     "compose:down": "docker compose down",
     "compose:logs": "docker compose logs -f backend",
