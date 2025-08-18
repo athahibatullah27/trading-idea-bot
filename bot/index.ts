@@ -395,7 +395,7 @@ client.once(Events.ClientReady, (readyClient) => {
     }
   });
   
-  // Start evaluation scheduler at specific UTC hours (03:00, 07:00, 11:00, 15:00, 19:00, 23:00)
+  // Start evaluation scheduler at specific UTC hours (00:00, 04:00, 08:00, 12:00, 16:00, 20:00)
   logAppState('STARTUP', { message: 'Starting trade recommendation evaluation scheduler at specific UTC hours...' });
   scheduleEvaluationAtSpecificHours();
   
@@ -411,14 +411,14 @@ function calculateNextEvaluationDelay(): number {
   const currentUTCSecond = now.getUTCSeconds();
   
   // Target evaluation hours in UTC
-  const evaluationHours = [3, 7, 11, 15, 19, 23];
+  const evaluationHours = [0, 4, 8, 12, 16, 20];
   
   // Find the next evaluation hour
   let nextHour = evaluationHours.find(hour => hour > currentUTCHour);
   
   // If no hour found today, use the first hour of tomorrow
   if (!nextHour) {
-    nextHour = evaluationHours[0]; // 03:00 UTC next day
+    nextHour = evaluationHours[0]; // 00:00 UTC next day
   }
   
   // Calculate target time
