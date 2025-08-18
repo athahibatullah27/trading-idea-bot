@@ -645,6 +645,7 @@ export function calculateEnhancedTechnicalIndicators(candlesticks: CandlestickDa
   const { support, resistance } = findMultipleSupportResistance(candlesticks);
   const { volumeTrend, averageVolume } = calculateVolumeTrend(candlesticks);
   const fibonacci = calculateFibonacciLevels(candlesticks);
+  const fibonacci = calculateFibonacciLevels(candlesticks);
   
   // Determine EMA trend
   let emaTrend: 'bullish' | 'bearish' | 'neutral' = 'neutral';
@@ -671,7 +672,7 @@ export function calculateEnhancedTechnicalIndicators(candlesticks: CandlestickDa
     emaTrend,
     support,
     resistance,
-    fibonacci,
+    fibonacci: calculateFibonacciLevels(candlesticks),
     currentPrice,
     priceChange24h,
     volume24h,
