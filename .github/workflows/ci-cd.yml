@@ -36,14 +36,32 @@ jobs:
       # You would add more steps here for testing, e.g.,
       # - name: Run tests
       #   run: docker run your-docker-repo/your-image-name:${{ github.sha }} npm test
-      # Or for deployment, e.g.,
-      # - name: Deploy to server
-      #   uses: appleboy/ssh-action@master
-      #   with:
-      #     host: ${{ secrets.SSH_HOST }}
-      #     username: ${{ secrets.SSH_USERNAME }}
-      #     key: ${{ secrets.SSH_PRIVATE_KEY }}
-      #     script: |
-      #       cd /path/to/your/app
-      #       docker compose pull your-service-name
-      #       docker compose up -d --no-deps your-service-name
+  deploy: # This is a new job for deployment
+    runs-on: ubuntu-latest
+    needs: build-test-and-push # This job depends on the 'build-test-and-push' job succeeding
+    environment: production # Optional: Link to a GitHub Environment for deployment protection rules
+
+    steps:
+      - name: Deploy to Production Server
+        uses: appleboy/ssh-action@master # A popular action for executing commands over SSH
+        with:
+          host: ${{ secrets.SSH_HOST }} # IP address or hostname of your server
+          username: ${{ secrets.SSH_USERNAME }} # SSH username for your server
+          key: ${{ secrets.SSH_PRIVATE_KEY }} # Your SSH private key (stored as a GitHub Secret)
+          script: | # Commands to execute on the remote server
+            echo "Connecting to production server..."
+            # Navigate to your application's directory on the server
+            cd trading-idea-bot/ 
+
+            # Pull the latest Docker image from your registry
+            # Replace 'your-docker-repo/your-image-name' with your actual image name
+            # and 'your-service-name' with the service name from your docker-compose.yml
+            echo "Pulling latest Docker image..."
+            docker compose pull backend # Assuming 'backend' is the service name in your docker-compose.yml
+
+            # Stop and remove the old container, then start a new one with the updated image
+            # The '--no-deps' flag ensures only the specified service is updated, not its dependencies
+            echo "Updating and restarting backend service..."
+            docker compose up -d --no-deps backend
+
+            echo "Deployment complete!"
