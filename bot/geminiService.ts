@@ -431,6 +431,7 @@ DATA:
     "dataTimestamp": "${marketData.dataTimestamp}",
     "4-HOUR TIMEFRAME ANALYSIS": {
       "Current Price": ${timeframes['4h'].indicators.currentPrice.toFixed(5)},
+      "Market Regime": "${timeframes['4h'].marketRegime}",
       "RSI (14)": ${timeframes['4h'].indicators.rsi.toFixed(1)},
       "RSI Trend": "${timeframes['4h'].indicators.rsiTrend}",
       "MACD": ${timeframes['4h'].indicators.macd.macd.toFixed(2)},
@@ -446,12 +447,28 @@ DATA:
       "EMA Trend": "${timeframes['4h'].indicators.emaTrend}",
       "Support Levels": [${timeframes['4h'].indicators.support.map(s => s.toFixed(5)).join(', ')}],
       "Resistance Levels": [${timeframes['4h'].indicators.resistance.map(r => r.toFixed(5)).join(', ')}],
+      "Fibonacci Retracement": {
+        "Swing High (0%)": ${timeframes['4h'].indicators.fibonacci.retracement.level_0.toFixed(5)},
+        "23.6%": ${timeframes['4h'].indicators.fibonacci.retracement.level_236.toFixed(5)},
+        "38.2%": ${timeframes['4h'].indicators.fibonacci.retracement.level_382.toFixed(5)},
+        "50%": ${timeframes['4h'].indicators.fibonacci.retracement.level_500.toFixed(5)},
+        "61.8%": ${timeframes['4h'].indicators.fibonacci.retracement.level_618.toFixed(5)},
+        "78.6%": ${timeframes['4h'].indicators.fibonacci.retracement.level_786.toFixed(5)},
+        "Swing Low (100%)": ${timeframes['4h'].indicators.fibonacci.retracement.level_1000.toFixed(5)}
+      },
+      "Fibonacci Extension": {
+        "127.2%": ${timeframes['4h'].indicators.fibonacci.extension.level_1272.toFixed(5)},
+        "161.8%": ${timeframes['4h'].indicators.fibonacci.extension.level_1618.toFixed(5)},
+        "261.8%": ${timeframes['4h'].indicators.fibonacci.extension.level_2618.toFixed(5)}
+      },
+      "Fibonacci Trend": "${timeframes['4h'].indicators.fibonacci.trend}",
       "Recent Candles (OHLCV)": [${timeframes['4h'].price.recentOHLCV.slice(-3).map(c => 
         `{"O": ${c.open.toFixed(5)}, "H": ${c.high.toFixed(5)}, "L": ${c.low.toFixed(5)}, "C": ${c.close.toFixed(5)}, "V": ${c.volume.toFixed(0)}}`
       ).join(', ')}]
     },
     "1-HOUR TIMEFRAME ANALYSIS": {
       "Current Price": ${timeframes['1h'].indicators.currentPrice.toFixed(5)},
+      "Market Regime": "${timeframes['1h'].marketRegime}",
       "RSI (14)": ${timeframes['1h'].indicators.rsi.toFixed(1)},
       "RSI Trend": "${timeframes['1h'].indicators.rsiTrend}",
       "MACD": ${timeframes['1h'].indicators.macd.macd.toFixed(2)},
@@ -467,6 +484,21 @@ DATA:
       "EMA Trend": "${timeframes['1h'].indicators.emaTrend}",
       "Support Levels": [${timeframes['1h'].indicators.support.map(s => s.toFixed(5)).join(', ')}],
       "Resistance Levels": [${timeframes['1h'].indicators.resistance.map(r => r.toFixed(5)).join(', ')}],
+      "Fibonacci Retracement": {
+        "Swing High (0%)": ${timeframes['1h'].indicators.fibonacci.retracement.level_0.toFixed(5)},
+        "23.6%": ${timeframes['1h'].indicators.fibonacci.retracement.level_236.toFixed(5)},
+        "38.2%": ${timeframes['1h'].indicators.fibonacci.retracement.level_382.toFixed(5)},
+        "50%": ${timeframes['1h'].indicators.fibonacci.retracement.level_500.toFixed(5)},
+        "61.8%": ${timeframes['1h'].indicators.fibonacci.retracement.level_618.toFixed(5)},
+        "78.6%": ${timeframes['1h'].indicators.fibonacci.retracement.level_786.toFixed(5)},
+        "Swing Low (100%)": ${timeframes['1h'].indicators.fibonacci.retracement.level_1000.toFixed(5)}
+      },
+      "Fibonacci Extension": {
+        "127.2%": ${timeframes['1h'].indicators.fibonacci.extension.level_1272.toFixed(5)},
+        "161.8%": ${timeframes['1h'].indicators.fibonacci.extension.level_1618.toFixed(5)},
+        "261.8%": ${timeframes['1h'].indicators.fibonacci.extension.level_2618.toFixed(5)}
+      },
+      "Fibonacci Trend": "${timeframes['1h'].indicators.fibonacci.trend}",
       "Recent Candles (OHLCV)": [${timeframes['1h'].price.recentOHLCV.slice(-3).map(c => 
         `{"O": ${c.open.toFixed(5)}, "H": ${c.high.toFixed(5)}, "L": ${c.low.toFixed(5)}, "C": ${c.close.toFixed(5)}, "V": ${c.volume.toFixed(0)}}`
       ).join(', ')}]
@@ -485,13 +517,15 @@ INSTRUCTIONS FOR ANALYSIS:
 **Expert Analytical Process:** Apply a systematic, top-down multi-timeframe analysis, prioritizing capital preservation.
 
 **Step 1: Establish Primary Trend (4-Hour Timeframe - Highest Priority):**
- - Analyze the 4-hour EMA trend, MACD trend, and recent OHLCV to determine the dominant market direction (bullish, bearish, or ranging).
+ - Analyze the 4-hour Market Regime, EMA trend, MACD trend, and recent OHLCV to determine the dominant market direction (bullish, bearish, or ranging).
  - Identify major 4-hour support and resistance levels. This timeframe provides the foundational context; all subsequent lower timeframe analysis MUST align with this primary trend for a high-confidence trade idea.
+ - Consider 4-hour Fibonacci levels as critical price zones. Price reactions at key Fibonacci retracement levels (38.2%, 50%, 61.8%) or extension levels can provide high-probability entry/exit points.
  - *Self-assessment:* Is the 4-hour trend direction clear and unambiguous? If not, note the ambiguity as a potential reason for a 'No Trade Idea'.
 
 **Step 2: Confirm Momentum and Setup (1-Hour Timeframe - Secondary Priority):**
- - Analyze the 1-hour EMA trend, MACD, and RSI. Crucially, assess if these indicators and their trends *align* with the established 4-hour trend. Strong alignment across timeframes is paramount for high confidence.
+ - Analyze the 1-hour Market Regime, EMA trend, MACD, and RSI. Crucially, assess if these indicators and their trends *align* with the established 4-hour trend. Strong alignment across timeframes is paramount for high confidence.
  - Identify key 1-hour support and resistance levels. Observe price action (OHLCV) reacting to or approaching these levels.
+ - Examine 1-hour Fibonacci levels for precise entry timing. Look for confluence between Fibonacci levels and other support/resistance zones.
  - Evaluate 1-hour RSI trend (rising/falling) and its position relative to overbought (70) and oversold (30) thresholds. A rising RSI from below 30 is a stronger bullish signal than a rising RSI above 70, which may indicate overextension and potential reversal.
  - Analyze 1-hour MACD for bullish/bearish crossovers and the histogram's trend (increasing/decreasing momentum). Confirm if it is reinforcing momentum in the direction of the 4-hour trend.
  - Interpret Bollinger Bands: Are they expanding (increasing volatility) or contracting (decreasing volatility)? Is price breaking out or consolidating within the bands?
@@ -504,13 +538,16 @@ INSTRUCTIONS FOR ANALYSIS:
 
 **Step 4: Confluence Assessment and Explicit Signal Weighting:**
  - Systematically weigh the strength of each aligned signal. Assign the *highest importance* to Multi-Timeframe Trend Alignment (4h and 1h in same direction) and Volume Confirmation.
+ - Assign *very high importance* to Market Regime alignment across timeframes and Fibonacci level confluences with support/resistance.
  - Assign *medium importance* to strong momentum indicator alignment (RSI trend, MACD crossover/histogram) and price action at key support/resistance levels.
  - Assign *lower importance* to individual candlestick patterns unless they occur at critical support/resistance with strong volume.
+ - Pay special attention to Fibonacci retracement levels during trending markets and extension levels during breakout scenarios.
  - Identify the strongest technical setup by assessing the overall confluence of aligned, weighted signals. A setup with 3-5 strongly confirming indicators is generally more successful.
  - *Self-assessment:* Is there overwhelming, weighted evidence for a clear directional bias? Or are signals mixed, ambiguous, or lacking sufficient confluence?
 
 **Step 5: Risk Management and Decision Formulation:**
  - Based on the strongest setup and its confluence, determine the optimal entry price. Consider current market structure and recent price action (e.g., a pullback to a key EMA or established support/resistance level).
+ - Use Fibonacci levels as precise entry and exit points. For example, enter long positions at 61.8% retracement in uptrends, or target extension levels for profit-taking.
  - Precisely place the stop-loss using multiple support/resistance levels to ensure robust risk management and minimize potential losses.
  - Calculate the Risk-Reward Ratio. If the calculated ratio is less than 2:1, the trade idea is considered invalid for a high-confidence setup. In such cases, state 'No Trade Idea'.
  - *Self-assessment:* Is the proposed trade idea robust from a risk management perspective? Does it meet the minimum 2:1 risk-reward ratio? Is capital preservation prioritized?
@@ -523,10 +560,14 @@ INSTRUCTIONS FOR ANALYSIS:
 
 IMPORTANT NOTES:
 - Use TREND analysis (rising/falling RSI, MACD trend, Bollinger expansion/contraction) with full contextual awareness.
+ Use MARKET REGIME analysis as the primary context, then apply TREND analysis (rising/falling RSI, MACD trend, Bollinger expansion/contraction) with full contextual awareness.
+ Prioritize FIBONACCI CONFLUENCES - when multiple Fibonacci levels align with support/resistance or when price is reacting at key Fibonacci zones.
 - Consider VOLUME CONFIRMATION (significantly above average volume on trending moves = higher confidence) as a critical validation.
 - Focus on RECENT PRICE ACTION from candlestick data, especially reactions at support/resistance.
+ Focus on RECENT PRICE ACTION from candlestick data, especially reactions at support/resistance and Fibonacci levels.
 - Ensure risk-reward ratio is at least 2:1 for all high-confidence trades.
 - Maintain HIGH PRECISION for all prices (up to 5 decimal places for accuracy).
+ Use Fibonacci levels for precise entry/exit targeting and risk management.
 
 **<output>**
 Respond ONLY with a valid JSON object in this exact format:
@@ -536,6 +577,7 @@ Respond ONLY with a valid JSON object in this exact format:
 - If 'direction' is 'no_trade_due_to_conflict', set 'entry', 'stopLoss', and 'riskReward' to 0.0, and 'confidence' to 'N/A' or below 75%, with 'technicalReasoning' explaining the lack of a clear setup or conflicting signals.
 - 'confidence' must be between 75-95 for high-quality setups. 'riskReward' is a decimal (e.g., 3.0).
 - 'technicalReasoning' must contain 5-6 items, explicitly focusing on multi-timeframe analysis, trend alignment, momentum, and volume confirmation, ordered by their impact on the decision.
+ 'technicalReasoning' must contain 5-6 items, explicitly focusing on market regime alignment, multi-timeframe analysis, Fibonacci confluences, trend alignment, momentum, and volume confirmation, ordered by their impact on the decision.
 **</output>**`;
 }
 
