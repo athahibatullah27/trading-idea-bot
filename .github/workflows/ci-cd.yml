@@ -38,7 +38,7 @@ jobs:
       #   run: docker run your-docker-repo/your-image-name:${{ github.sha }} npm test
   deploy: # This is a new job for deployment
     runs-on: ubuntu-latest
-    needs: build-test-and-push # This job depends on the 'build-test-and-push' job succeeding
+    needs: build-and-push # This job depends on the 'build-test-and-push' job succeeding
     environment: production # Optional: Link to a GitHub Environment for deployment protection rules
 
     steps:
