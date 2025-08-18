@@ -247,7 +247,11 @@ app.get('/api/evaluated-recommendations', async (req, res) => {
     logDatabaseOperation({
       operation: 'SELECT',
       table: 'trade_recommendations',
-      query: 'SELECT * FROM trade_recommendations ORDER BY created_at DESC LIMIT 50'
+      headers: {
+        'User-Agent': req.headers['user-agent'],
+        'Accept': req.headers['accept']
+      },
+      context: 'test connection'
     });
     
     const { data: recommendations, error } = await supabase
@@ -858,7 +862,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       
       try {
         // Fetch comprehensive market data
-        const marketData = await getEnhancedDerivativesMarketData(symbol);
+        const marketData = await getEnhancedDerivativesMarketData(symbol, 'derivative trade');
         
         // Update loading message
         logDiscordInteraction('EDIT_REPLY', { 
@@ -868,7 +872,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await interaction.editReply(`🤖 **Generating enhanced AI trade idea for ${symbol}...**\n*Analyzing multi-timeframe technical indicators and recent price action*`);
         
         // Generate trade idea using Gemini
-        const tradeIdea = await generateDerivativesTradeIdea(marketData);
+        const tradeIdea = await generateDerivativesTradeIdea(marketData, 'derivative trade');
         
         if (!tradeIdea) {
           logDiscordInteraction('EDIT_REPLY', { 
@@ -1015,7 +1019,7 @@ async function createMarketOverviewEmbed() {
     logFunctionEntry('createMarketOverviewEmbed');
     log('INFO', 'Fetching real-time market data for overview...');
     
-    // Fetch real-time data for major cryptocurrencies
+      logApiResponse({
     const majorCryptos = ['BTC', 'ETH', 'SOL', 'ADA', 'BNB'];
     const cryptoData = await getMultipleCryptoData(majorCryptos);
     
@@ -1208,16 +1212,18 @@ function createNewsEmbed(newsData?: NewsItem[]) {
   
   const newsToDisplay = newsData;
   const isRealTime = !!newsData;
-  
+        data: result,
+        context: 'test connection'
   const embed = new EmbedBuilder()
     .setColor(0x3b82f6)
     .setTitle(`📰 ${isRealTime ? 'Live' : 'Cached'} Crypto News & Sentiment`)
     .setDescription(`${isRealTime ? 'Real-time' : 'Recent'} market-moving news with sentiment analysis`)
     .setTimestamp()
     .setFooter({ text: `CryptoTrader Bot • ${isRealTime ? 'Live' : 'Cached'} News Analysis` });
-
+      logApiResponse({
   newsToDisplay.forEach((news: NewsItem, index: number) => {
-    const sentimentEmoji = news.sentiment === 'bullish' ? '🟢' : 
+        error: error.message,
+        context: 'test connection'
                           news.sentiment === 'bearish' ? '🔴' : '🟡';
     const impactEmoji = news.impact === 'high' ? '🔥' : 
                        news.impact === 'medium' ? '⚡' : '💫';

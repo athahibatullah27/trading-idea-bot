@@ -6,14 +6,15 @@ export interface ApiCallDetails {
   headers?: Record<string, any>;
   body?: any;
   params?: Record<string, any>;
+  context?: string;
 }
 
 export interface ApiResponseDetails {
   status: number;
   statusText?: string;
   data?: any;
-  headers?: Record<string, any>;
   error?: any;
+  context?: string;
 }
 
 export interface DatabaseOperation {
@@ -48,7 +49,8 @@ export function formatTimestamp(): string {
 // Log API request
 export function logApiRequest(details: ApiCallDetails): void {
   const timestamp = formatTimestamp();
-  console.log(`[${timestamp}] 🌐 API REQUEST`);
+  const contextSuffix = details.context ? ` - ${details.context}` : '';
+  console.log(`[${timestamp}] 🌐 API REQUEST${contextSuffix}`);
   console.log(`  📍 Endpoint: ${details.endpoint}`);
   console.log(`  🔧 Method: ${details.method}`);
   
@@ -66,18 +68,14 @@ export function logApiRequest(details: ApiCallDetails): void {
 }
 
 // Log API response
-export function logApiResponse(endpoint: string, details: ApiResponseDetails): void {
+export function logApiResponse(details: ApiResponseDetails): void {
   const timestamp = formatTimestamp();
   const statusEmoji = details.status >= 200 && details.status < 300 ? '✅' : 
                      details.status >= 400 && details.status < 500 ? '⚠️' : '❌';
   
-  console.log(`[${timestamp}] ${statusEmoji} API RESPONSE`);
-  console.log(`  📍 Endpoint: ${endpoint}`);
+  const contextSuffix = details.context ? ` - ${details.context}` : '';
+  console.log(`[${timestamp}] ${statusEmoji} API RESPONSE${contextSuffix}`);
   console.log(`  📊 Status: ${details.status} ${details.statusText || ''}`);
-  
-  if (details.headers && Object.keys(details.headers).length > 0) {
-    console.log(`  📋 Response Headers:`, sanitizeHeaders(details.headers));
-  }
   
   if (details.data) {
     const dataStr = typeof details.data === 'string' ? details.data : JSON.stringify(details.data);

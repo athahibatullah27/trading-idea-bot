@@ -32,7 +32,8 @@ export interface DerivativesTradeIdea {
 export async function generateGeminiRecommendations(
   cryptoData: CryptoData[],
   news?: NewsItem[],
-  marketConditions?: MarketConditions
+  marketConditions?: MarketConditions,
+  context?: string
 ): Promise<TradingRecommendation[]> {
   const timerId = startPerformanceTimer('generateGeminiRecommendations');
   logFunctionEntry('generateGeminiRecommendations', { 
@@ -75,7 +76,8 @@ export async function generateGeminiRecommendations(
         model: 'gemini-2.0-flash-exp',
         promptLength: prompt.length,
         cryptoSymbols: cryptoData.map(c => c.symbol)
-      }
+      },
+      context
     });
     
     // Generate content using Gemini
@@ -83,12 +85,13 @@ export async function generateGeminiRecommendations(
     const response = await result.response;
     const text = response.text();
     
-    logApiResponse('Gemini AI API', {
+    logApiResponse({
       status: 200,
       data: {
         responseLength: text.length,
         responsePreview: text.substring(0, 200) + '...'
-      }
+      },
+      context
     });
     
     log('INFO', 'Received response from Gemini API');
@@ -110,9 +113,10 @@ export async function generateGeminiRecommendations(
   } catch (error) {
     log('ERROR', 'Error generating Gemini recommendations', error.message);
     
-    logApiResponse('Gemini AI API', {
+    logApiResponse({
       status: 500,
-      error: error.message
+      error: error.message,
+      context
     });
     
     logFunctionExit('generateGeminiRecommendations', []);
@@ -329,7 +333,8 @@ function parseGeminiResponse(text: string, cryptoData: CryptoData[]): TradingRec
 }
 
 export async function generateDerivativesTradeIdea(
-  marketData: EnhancedDerivativesMarketData
+  marketData: EnhancedDerivativesMarketData,
+  context?: string
 ): Promise<DerivativesTradeIdea | null> {
   const timerId = startPerformanceTimer('generateDerivativesTradeIdea');
   logFunctionEntry('generateDerivativesTradeIdea', { symbol: marketData.symbol });
@@ -362,7 +367,8 @@ export async function generateDerivativesTradeIdea(
         promptLength: prompt.length,
         symbol: marketData.symbol,
         timeframes: Object.keys(marketData.timeframes)
-      }
+      },
+      context
     });
     
     // Generate content using Gemini
@@ -370,12 +376,13 @@ export async function generateDerivativesTradeIdea(
     const response = await result.response;
     const text = response.text();
     
-    logApiResponse('Gemini AI API (Derivatives)', {
+    logApiResponse({
       status: 200,
       data: {
         responseLength: text.length,
         responsePreview: text.substring(0, 200) + '...'
-      }
+      },
+      context
     });
     
     log('INFO', 'Received derivatives trade response from Gemini API');
@@ -401,9 +408,10 @@ export async function generateDerivativesTradeIdea(
   } catch (error) {
     log('ERROR', 'Error generating derivatives trade idea', error.message);
     
-    logApiResponse('Gemini AI API (Derivatives)', {
+    logApiResponse({
       status: 500,
-      error: error.message
+      error: error.message,
+      context
     });
     
     logFunctionExit('generateDerivativesTradeIdea', null);

@@ -88,7 +88,8 @@ export interface EnhancedDerivativesMarketData {
 export async function fetchCandlestickData(
   symbol: string, 
   interval: string = '1h', 
-  limit: number = 100
+  limit: number = 100,
+  context?: string
 ): Promise<CandlestickData[]> {
   const timerId = startPerformanceTimer('fetchCandlestickData');
   logFunctionEntry('fetchCandlestickData', { symbol, interval, limit });
@@ -109,7 +110,8 @@ export async function fetchCandlestickData(
       params,
       headers: {
         'User-Agent': 'CryptoTrader-Bot/1.0'
-      }
+      },
+      context
     });
     
     const response = await axios.get(url, {
@@ -120,11 +122,11 @@ export async function fetchCandlestickData(
       }
     });
     
-    logApiResponse(url, {
+    logApiResponse({
       status: response.status,
       statusText: response.statusText,
       data: response.data,
-      headers: response.headers
+      context
     });
     
     if (!response.data || !Array.isArray(response.data)) {
@@ -156,11 +158,11 @@ export async function fetchCandlestickData(
     log('ERROR', `Error fetching candlestick data for ${symbol} (${interval})`, error.message);
     
     if (error.response) {
-      logApiResponse(error.config?.url || 'unknown', {
+      logApiResponse({
         status: error.response.status,
         statusText: error.response.statusText,
-        data: error.response.data,
-        error: error.response.data
+        error: error.response.data,
+        context
       });
     }
     
@@ -471,7 +473,7 @@ export function calculateEnhancedTechnicalIndicators(candlesticks: CandlestickDa
 }
 
 // Function to get enhanced multi-timeframe derivatives market data
-export async function getEnhancedDerivativesMarketData(symbol: string): Promise<EnhancedDerivativesMarketData> {
+export async function getEnhancedDerivativesMarketData(symbol: string, context?: string): Promise<EnhancedDerivativesMarketData> {
   const timerId = startPerformanceTimer('getEnhancedDerivativesMarketData');
   logFunctionEntry('getEnhancedDerivativesMarketData', { symbol });
   
@@ -480,8 +482,8 @@ export async function getEnhancedDerivativesMarketData(symbol: string): Promise<
     
     // Fetch candlestick data for both timeframes
     const [candlesticks4h, candlesticks1h] = await Promise.all([
-      fetchCandlestickData(symbol, '4h', 100),
-      fetchCandlestickData(symbol, '1h', 200) // More data for better volume analysis
+      fetchCandlestickData(symbol, '4h', 100, context),
+      fetchCandlestickData(symbol, '1h', 200, context) // More data for better volume analysis
     ]);
     
     // Calculate technical indicators for both timeframes
@@ -574,7 +576,8 @@ export async function testBinanceFuturesAPI(): Promise<boolean> {
       method: 'GET',
       headers: {
         'User-Agent': 'CryptoTrader-Bot/1.0'
-      }
+      },
+      context: 'test connection'
     });
     
     const response = await axios.get(`${BINANCE_FUTURES_API_BASE}/fapi/v1/ping`, {
@@ -584,11 +587,11 @@ export async function testBinanceFuturesAPI(): Promise<boolean> {
       }
     });
     
-    logApiResponse(testUrl, {
+    logApiResponse({
       status: response.status,
       statusText: response.statusText,
       data: response.data,
-      headers: response.headers
+      context: 'test connection'
     });
     
     if (response.status === 200) {
@@ -605,11 +608,11 @@ export async function testBinanceFuturesAPI(): Promise<boolean> {
     log('ERROR', 'Binance Futures API test failed', error.message);
     
     if (error.response) {
-      logApiResponse(error.config?.url || 'unknown', {
+      logApiResponse({
         status: error.response.status,
         statusText: error.response.statusText,
-        data: error.response.data,
-        error: error.response.data
+        error: error.response.data,
+        context: 'test connection'
       });
     }
     

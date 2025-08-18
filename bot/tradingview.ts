@@ -14,7 +14,7 @@ import {
 const TRADINGVIEW_API_BASE = 'https://scanner.tradingview.com';
 
 // Helper function to get real-time crypto data from TradingView
-export async function getRealTimeCryptoData(symbol: string): Promise<CryptoData | null> {
+export async function getRealTimeCryptoData(symbol: string, context?: string): Promise<CryptoData | null> {
   const timerId = startPerformanceTimer('getRealTimeCryptoData');
   logFunctionEntry('getRealTimeCryptoData', { symbol });
   
@@ -56,7 +56,8 @@ export async function getRealTimeCryptoData(symbol: string): Promise<CryptoData 
             'Content-Type': 'application/json',
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
           },
-          body: scannerData
+          body: scannerData,
+          context
         });
 
         const response = await axios.post(`${TRADINGVIEW_API_BASE}/america/scan`, scannerData, {
@@ -67,11 +68,11 @@ export async function getRealTimeCryptoData(symbol: string): Promise<CryptoData 
           timeout: 8000
         });
 
-        logApiResponse(endpoint, {
+        logApiResponse({
           status: response.status,
           statusText: response.statusText,
           data: response.data,
-          headers: response.headers
+          context
         });
 
         if (response.data && response.data.data && response.data.data.length > 0) {
@@ -113,9 +114,10 @@ export async function getRealTimeCryptoData(symbol: string): Promise<CryptoData 
           }
         }
       } catch (tickerError) {
-        logApiResponse(`${TRADINGVIEW_API_BASE}/america/scan`, {
+        logApiResponse({
           status: tickerError.response?.status || 0,
-          error: tickerError
+          error: tickerError,
+          context
         });
         log('WARN', `Failed to fetch from ${ticker}`, tickerError.message);
         continue; // Try next ticker format
@@ -131,7 +133,7 @@ export async function getRealTimeCryptoData(symbol: string): Promise<CryptoData 
     // Try alternative API approach
     try {
       log('INFO', `Trying alternative data source for ${symbol}...`);
-      return await getAlternativeData(symbol);
+      return await getAlternativeData(symbol, context);
     } catch (altError) {
       log('ERROR', `Alternative API also failed for ${symbol}`, altError.message);
       logFunctionExit('getRealTimeCryptoData', null);
@@ -142,7 +144,7 @@ export async function getRealTimeCryptoData(symbol: string): Promise<CryptoData 
 }
 
 // Alternative data source using a different endpoint
-async function getAlternativeData(symbol: string): Promise<CryptoData | null> {
+async function getAlternativeData(symbol: string, context?: string): Promise<CryptoData | null> {
   const timerId = startPerformanceTimer('getAlternativeData');
   logFunctionEntry('getAlternativeData', { symbol });
   
@@ -172,7 +174,8 @@ async function getAlternativeData(symbol: string): Promise<CryptoData | null> {
       method: 'GET',
       headers: {
         'User-Agent': 'CryptoTrader-Bot/1.0'
-      }
+      },
+      context
     });
 
     const response = await axios.get(
@@ -185,11 +188,11 @@ async function getAlternativeData(symbol: string): Promise<CryptoData | null> {
       }
     );
 
-    logApiResponse(endpoint, {
+    logApiResponse({
       status: response.status,
       statusText: response.statusText,
       data: response.data,
-      headers: response.headers
+      context
     });
 
     const data = response.data[coinId];
@@ -254,7 +257,7 @@ function getCryptoName(symbol: string): string {
 }
 
 // Function to get multiple crypto data at once
-export async function getMultipleCryptoData(symbols: string[]): Promise<CryptoData[]> {
+export async function getMultipleCryptoData(symbols: string[], context?: string): Promise<CryptoData[]> {
   const timerId = startPerformanceTimer('getMultipleCryptoData');
   logFunctionEntry('getMultipleCryptoData', { symbols, count: symbols.length });
   
@@ -267,7 +270,7 @@ export async function getMultipleCryptoData(symbols: string[]): Promise<CryptoDa
     const symbol = symbols[i];
     
     try {
-      const data = await getRealTimeCryptoData(symbol);
+      const data = await getRealTimeCryptoData(symbol, context);
       if (data) {
         results.push(data);
       }
@@ -310,7 +313,7 @@ export async function testAPIConnection(): Promise<boolean> {
   
   try {
     log('INFO', 'Testing API connection...');
-    const testData = await getRealTimeCryptoData('BTC');
+    const testData = await getRealTimeCryptoData('BTC', 'test connection');
     if (testData && testData.price > 0) {
       log('INFO', 'API connection test successful');
       logFunctionExit('testAPIConnection', true);

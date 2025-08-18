@@ -139,7 +139,7 @@ function formatTimestamp(publishedOn: number): string {
 }
 
 // Main function to fetch news from CoinDesk API
-export async function fetchCoinDeskNews(limit: number = 10): Promise<NewsItem[]> {
+export async function fetchCoinDeskNews(limit: number = 10, context?: string): Promise<NewsItem[]> {
   const timerId = startPerformanceTimer('fetchCoinDeskNews');
   logFunctionEntry('fetchCoinDeskNews', { limit });
   
@@ -156,7 +156,8 @@ export async function fetchCoinDeskNews(limit: number = 10): Promise<NewsItem[]>
         'User-Agent': 'CryptoTrader-Bot/1.0',
         'Accept': 'application/json',
         'Content-Type': 'application/json'
-      }
+      },
+      context
     });
     
     const response = await axios.get<CryptoCompareResponse>(
@@ -171,11 +172,11 @@ export async function fetchCoinDeskNews(limit: number = 10): Promise<NewsItem[]>
       }
     );
     
-    logApiResponse(url, {
+    logApiResponse({
       status: response.status,
       statusText: response.statusText,
       data: response.data,
-      headers: response.headers
+      context
     });
     
     log('INFO', `CryptoCompare API Response Status: ${response.status}`);
@@ -280,12 +281,11 @@ export async function fetchCoinDeskNews(limit: number = 10): Promise<NewsItem[]>
     log('ERROR', 'Error fetching news from CryptoCompare API', error.message);
     
     if (error.response) {
-      logApiResponse(error.config?.url || 'unknown', {
+      logApiResponse({
         status: error.response.status,
         statusText: error.response.statusText,
-        data: error.response.data,
-        headers: error.response.headers,
-        error: error.response.data
+        error: error.response.data,
+        context
       });
       
       log('ERROR', 'CryptoCompare API response error:', {
@@ -327,7 +327,8 @@ export async function testCoinDeskAPI(): Promise<boolean> {
         'User-Agent': 'CryptoTrader-Bot/1.0',
         'Accept': 'application/json',
         'Content-Type': 'application/json'
-      }
+      },
+      context: 'test connection'
     });
     
     const response = await axios.get(
@@ -342,11 +343,11 @@ export async function testCoinDeskAPI(): Promise<boolean> {
       }
     );
     
-    logApiResponse(testUrl, {
+    logApiResponse({
       status: response.status,
       statusText: response.statusText,
       data: response.data,
-      headers: response.headers
+      context: 'test connection'
     });
     
     log('INFO', `CryptoCompare Test Response Status: ${response.status}`);
@@ -369,11 +370,11 @@ export async function testCoinDeskAPI(): Promise<boolean> {
     log('ERROR', 'CryptoCompare API test failed', error.message);
     
     if (error.response) {
-      logApiResponse(error.config?.url || 'unknown', {
+      logApiResponse({
         status: error.response.status,
         statusText: error.response.statusText,
-        data: error.response.data,
-        error: error.response.data
+        error: error.response.data,
+        context: 'test connection'
       });
       
       log('ERROR', 'Test response error:', {
