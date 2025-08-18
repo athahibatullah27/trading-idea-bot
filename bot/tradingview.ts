@@ -1,13 +1,25 @@
 import axios from 'axios';
-import { CryptoData } from '../src/types/trading.js';
+import { CryptoData } from './types.js';
+import { 
+  logApiRequest, 
+  logApiResponse, 
+  startPerformanceTimer, 
+  endPerformanceTimer,
+  logFunctionEntry,
+  logFunctionExit,
+  log
+} from './utils/logger.js';
 
 // TradingView API endpoints
 const TRADINGVIEW_API_BASE = 'https://scanner.tradingview.com';
 
 // Helper function to get real-time crypto data from TradingView
-export async function getRealTimeCryptoData(symbol: string): Promise<CryptoData | null> {
+export async function getRealTimeCryptoData(symbol: string, context?: string): Promise<CryptoData | null> {
+  const timerId = startPerformanceTimer('getRealTimeCryptoData');
+  logFunctionEntry('getRealTimeCryptoData', { symbol });
+  
   try {
-    console.log(`Fetching real-time data for ${symbol}...`);
+    log('INFO', `Fetching real-time data for ${symbol}...`);
     
     // Try multiple ticker formats for better success rate
     const tickerFormats = [
@@ -20,7 +32,7 @@ export async function getRealTimeCryptoData(symbol: string): Promise<CryptoData 
 
     for (const ticker of tickerFormats) {
       try {
-        console.log(`Trying TradingView ticker: ${ticker}`);
+        log('INFO', `Trying TradingView ticker: ${ticker}`);
         
         const scannerData = {
           options: { lang: "en" },
@@ -36,12 +48,31 @@ export async function getRealTimeCryptoData(symbol: string): Promise<CryptoData 
           range: [0, 1]
         };
 
+        const endpoint = `${TRADINGVIEW_API_BASE}/america/scan`;
+        logApiRequest({
+          endpoint,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          },
+          body: scannerData,
+          context
+        });
+
         const response = await axios.post(`${TRADINGVIEW_API_BASE}/america/scan`, scannerData, {
           headers: {
             'Content-Type': 'application/json',
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
           },
           timeout: 8000
+        });
+
+        logApiResponse({
+          status: response.status,
+          statusText: response.statusText,
+          data: response.data,
+          context
         });
 
         if (response.data && response.data.data && response.data.data.length > 0) {
@@ -71,17 +102,24 @@ export async function getRealTimeCryptoData(symbol: string): Promise<CryptoData 
               }
             };
 
-            console.log(`✅ Successfully fetched TradingView data for ${symbol} via ${ticker}:`, {
+            log('INFO', `Successfully fetched TradingView data for ${symbol} via ${ticker}`, {
               price: price,
               change24h: changePercent?.toFixed(2) + '%',
               rsi: rsi?.toFixed(1)
             });
 
+            logFunctionExit('getRealTimeCryptoData', cryptoData);
+            endPerformanceTimer(timerId);
             return cryptoData;
           }
         }
       } catch (tickerError) {
-        console.log(`Failed to fetch from ${ticker}:`, tickerError.message);
+        logApiResponse({
+          status: tickerError.response?.status || 0,
+          error: tickerError,
+          context
+        });
+        log('WARN', `Failed to fetch from ${ticker}`, tickerError.message);
         continue; // Try next ticker format
       }
     }
@@ -90,22 +128,28 @@ export async function getRealTimeCryptoData(symbol: string): Promise<CryptoData 
     throw new Error('No data received from TradingView API with any ticker format');
 
   } catch (error) {
-    console.error(`❌ Error fetching real-time data for ${symbol}:`, error.message);
+    log('ERROR', `Error fetching real-time data for ${symbol}`, error.message);
     
     // Try alternative API approach
     try {
-      return await getAlternativeData(symbol);
+      log('INFO', `Trying alternative data source for ${symbol}...`);
+      return await getAlternativeData(symbol, context);
     } catch (altError) {
-      console.error(`❌ Alternative API also failed for ${symbol}:`, altError.message);
+      log('ERROR', `Alternative API also failed for ${symbol}`, altError.message);
+      logFunctionExit('getRealTimeCryptoData', null);
+      endPerformanceTimer(timerId);
       return null;
     }
   }
 }
 
 // Alternative data source using a different endpoint
-async function getAlternativeData(symbol: string): Promise<CryptoData | null> {
+async function getAlternativeData(symbol: string, context?: string): Promise<CryptoData | null> {
+  const timerId = startPerformanceTimer('getAlternativeData');
+  logFunctionEntry('getAlternativeData', { symbol });
+  
   try {
-    console.log(`Trying alternative data source for ${symbol}...`);
+    log('INFO', `Trying alternative data source for ${symbol}...`);
     
     // Using CoinGecko API as fallback
     const coinGeckoIds: { [key: string]: string } = {
@@ -119,11 +163,23 @@ async function getAlternativeData(symbol: string): Promise<CryptoData | null> {
 
     const coinId = coinGeckoIds[symbol];
     if (!coinId) {
+      logFunctionExit('getAlternativeData', null);
+      endPerformanceTimer(timerId);
       throw new Error(`No CoinGecko ID found for ${symbol}`);
     }
 
+    const endpoint = `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&include_24hr_change=true&include_market_cap=true&include_24hr_vol=true`;
+    logApiRequest({
+      endpoint,
+      method: 'GET',
+      headers: {
+        'User-Agent': 'CryptoTrader-Bot/1.0'
+      },
+      context
+    });
+
     const response = await axios.get(
-      `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&include_24hr_change=true&include_market_cap=true&include_24hr_vol=true`,
+      endpoint,
       { 
         timeout: 8000,
         headers: {
@@ -132,8 +188,17 @@ async function getAlternativeData(symbol: string): Promise<CryptoData | null> {
       }
     );
 
+    logApiResponse({
+      status: response.status,
+      statusText: response.statusText,
+      data: response.data,
+      context
+    });
+
     const data = response.data[coinId];
     if (!data) {
+      logFunctionExit('getAlternativeData', null);
+      endPerformanceTimer(timerId);
       throw new Error('No data from CoinGecko');
     }
 
@@ -157,15 +222,19 @@ async function getAlternativeData(symbol: string): Promise<CryptoData | null> {
       }
     };
 
-    console.log(`✅ Alternative API success for ${symbol}:`, {
+    log('INFO', `Alternative API success for ${symbol}`, {
       price: data.usd,
       change24h: data.usd_24h_change?.toFixed(2) + '%'
     });
 
+    logFunctionExit('getAlternativeData', cryptoData);
+    endPerformanceTimer(timerId);
     return cryptoData;
 
   } catch (error) {
-    console.error(`❌ Alternative API failed for ${symbol}:`, error.message);
+    log('ERROR', `Alternative API failed for ${symbol}`, error.message);
+    logFunctionExit('getAlternativeData', null);
+    endPerformanceTimer(timerId);
     return null;
   }
 }
@@ -188,8 +257,11 @@ function getCryptoName(symbol: string): string {
 }
 
 // Function to get multiple crypto data at once
-export async function getMultipleCryptoData(symbols: string[]): Promise<CryptoData[]> {
-  console.log(`🔄 Fetching data for multiple cryptos: ${symbols.join(', ')}`);
+export async function getMultipleCryptoData(symbols: string[], context?: string): Promise<CryptoData[]> {
+  const timerId = startPerformanceTimer('getMultipleCryptoData');
+  logFunctionEntry('getMultipleCryptoData', { symbols, count: symbols.length });
+  
+  log('INFO', `Fetching data for multiple cryptos: ${symbols.join(', ')}`);
   
   // Add delay between requests to avoid rate limiting
   const results: CryptoData[] = [];
@@ -198,22 +270,24 @@ export async function getMultipleCryptoData(symbols: string[]): Promise<CryptoDa
     const symbol = symbols[i];
     
     try {
-      const data = await getRealTimeCryptoData(symbol);
+      const data = await getRealTimeCryptoData(symbol, context);
       if (data) {
         results.push(data);
       }
     } catch (error) {
-      console.error(`Failed to fetch data for ${symbol}:`, error.message);
+      log('ERROR', `Failed to fetch data for ${symbol}`, error.message);
     }
     
     // Add delay between requests (except for the last one)
     if (i < symbols.length - 1) {
-      console.log(`⏳ Waiting 300ms before next request to avoid rate limits...`);
+      log('INFO', `Waiting 300ms before next request to avoid rate limits...`);
       await new Promise(resolve => setTimeout(resolve, 300));
     }
   }
   
-  console.log(`✅ Successfully fetched data for ${results.length}/${symbols.length} cryptos`);
+  log('INFO', `Successfully fetched data for ${results.length}/${symbols.length} cryptos`);
+  logFunctionExit('getMultipleCryptoData', { successCount: results.length, totalCount: symbols.length });
+  endPerformanceTimer(timerId);
   return results;
 
   /* Old parallel approach - keeping as backup
@@ -234,16 +308,25 @@ export async function getMultipleCryptoData(symbols: string[]): Promise<CryptoDa
 
 // Function to test API connectivity
 export async function testAPIConnection(): Promise<boolean> {
+  const timerId = startPerformanceTimer('testAPIConnection');
+  logFunctionEntry('testAPIConnection');
+  
   try {
-    console.log('🧪 Testing API connection...');
-    const testData = await getRealTimeCryptoData('BTC');
+    log('INFO', 'Testing API connection...');
+    const testData = await getRealTimeCryptoData('BTC', 'test connection');
     if (testData && testData.price > 0) {
-      console.log('✅ API connection test successful');
+      log('INFO', 'API connection test successful');
+      logFunctionExit('testAPIConnection', true);
+      endPerformanceTimer(timerId);
       return true;
     }
+    logFunctionExit('testAPIConnection', false);
+    endPerformanceTimer(timerId);
     return false;
   } catch (error) {
-    console.log('❌ API connection test failed:', error.message);
+    log('ERROR', 'API connection test failed', error.message);
+    logFunctionExit('testAPIConnection', false);
+    endPerformanceTimer(timerId);
     return false;
   }
 }

@@ -1,5 +1,14 @@
 import axios from 'axios';
-import { NewsItem } from '../src/types/trading.js';
+import { NewsItem } from './types.js';
+import { 
+  logApiRequest, 
+  logApiResponse, 
+  startPerformanceTimer, 
+  endPerformanceTimer,
+  logFunctionEntry,
+  logFunctionExit,
+  log
+} from './utils/logger.js';
 
 // CoinDesk API configuration
 const CRYPTOCOMPARE_API_BASE = 'https://min-api.cryptocompare.com';
@@ -130,12 +139,26 @@ function formatTimestamp(publishedOn: number): string {
 }
 
 // Main function to fetch news from CoinDesk API
-export async function fetchCoinDeskNews(limit: number = 10): Promise<NewsItem[]> {
+export async function fetchCoinDeskNews(limit: number = 10, context?: string): Promise<NewsItem[]> {
+  const timerId = startPerformanceTimer('fetchCoinDeskNews');
+  logFunctionEntry('fetchCoinDeskNews', { limit });
+  
   try {
-    console.log(`📰 Fetching ${limit} latest news articles from CryptoCompare API...`);
+    log('INFO', `Fetching ${limit} latest news articles from CryptoCompare API...`);
     
     const url = `${CRYPTOCOMPARE_API_BASE}/data/v2/news/?lang=EN&sortOrder=latest&limit=${limit}`;
-    console.log(`🌐 CryptoCompare API URL: ${url}`);
+    log('INFO', `CryptoCompare API URL: ${url}`);
+    
+    logApiRequest({
+      endpoint: url,
+      method: 'GET',
+      headers: {
+        'User-Agent': 'CryptoTrader-Bot/1.0',
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      context
+    });
     
     const response = await axios.get<CryptoCompareResponse>(
       url,
@@ -149,9 +172,15 @@ export async function fetchCoinDeskNews(limit: number = 10): Promise<NewsItem[]>
       }
     );
     
-    console.log(`📊 CryptoCompare API Response Status: ${response.status}`);
-    console.log(`📊 CryptoCompare API Response Headers:`, response.headers);
-    console.log(`📊 CryptoCompare API Response Data (first 500 chars):`, JSON.stringify(response.data).substring(0, 500));
+    logApiResponse({
+      status: response.status,
+      statusText: response.statusText,
+      data: response.data,
+      context
+    });
+    
+    log('INFO', `CryptoCompare API Response Status: ${response.status}`);
+    log('INFO', `CryptoCompare API Response Data (first 500 chars): ${JSON.stringify(response.data).substring(0, 500)}`);
     
     // Handle response structure - CryptoCompare uses lowercase fields in Data array
     let articles: CryptoCompareArticle[] = [];
@@ -162,30 +191,32 @@ export async function fetchCoinDeskNews(limit: number = 10): Promise<NewsItem[]>
       
       // Convert lowercase fields to uppercase for consistency
       articles = rawArticles.map((item: any) => ({
-        ID: item.id || item.ID,
-        TITLE: item.title || item.TITLE,
-        BODY: item.body || item.BODY || '',
-        PUBLISHED_ON: item.published_on || item.PUBLISHED_ON,
-        URL: item.url || item.URL,
-        SOURCE_DATA: item.source_data || item.SOURCE_DATA || { name: 'CryptoCompare' },
-        SENTIMENT: item.sentiment || item.SENTIMENT
+        ID: item.ID || item.id || 0,
+        TITLE: item.TITLE || item.title || '',
+        BODY: item.BODY || item.body || '',
+        PUBLISHED_ON: item.PUBLISHED_ON || item.published_on || Date.now() / 1000,
+        URL: item.URL || item.url || '',
+        SOURCE_DATA: item.SOURCE_DATA || item.source_data || { name: 'CryptoCompare' },
+        SENTIMENT: item.SENTIMENT || item.sentiment || ''
       }));
       
-      console.log(`✅ Successfully fetched ${articles.length} articles from CryptoCompare`);
-      console.log(`📊 Sample article fields:`, {
-        id: rawArticles[0]?.id,
-        title: rawArticles[0]?.title?.substring(0, 50) + '...',
-        published_on: rawArticles[0]?.published_on,
-        sentiment: rawArticles[0]?.sentiment
+      log('INFO', `Successfully fetched ${articles.length} articles from CryptoCompare`);
+      log('INFO', `Sample article fields:`, {
+        ID: rawArticles[0]?.ID,
+        TITLE: (rawArticles[0]?.TITLE)?.substring(0, 50) + '...',
+        PUBLISHED_ON: rawArticles[0]?.PUBLISHED_ON,
+        SENTIMENT: rawArticles[0]?.SENTIMENT
       });
     } else {
-      console.error('❌ CryptoCompare API returned invalid structure:', response.data);
+      log('ERROR', 'CryptoCompare API returned invalid structure', response.data);
+      logFunctionExit('fetchCoinDeskNews', []);
+      endPerformanceTimer(timerId);
       throw new Error('Invalid response format from CryptoCompare API');
     }
     
     // Limit articles to requested amount to avoid Discord embed limits
     const limitedArticles = articles.slice(0, limit);
-    console.log(`📊 Using ${limitedArticles.length} articles (limited from ${articles.length})`);
+    log('INFO', `Using ${limitedArticles.length} articles (limited from ${articles.length})`);
     
     // Convert CryptoCompare articles to our NewsItem format
     const newsItems: NewsItem[] = limitedArticles.map((article: CryptoCompareArticle) => {
@@ -236,45 +267,69 @@ export async function fetchCoinDeskNews(limit: number = 10): Promise<NewsItem[]>
       };
     });
     
-    console.log(`📊 Processed news sentiment analysis:`, {
+    log('INFO', `Processed news sentiment analysis:`, {
       bullish: newsItems.filter(n => n.sentiment === 'bullish').length,
       bearish: newsItems.filter(n => n.sentiment === 'bearish').length,
       neutral: newsItems.filter(n => n.sentiment === 'neutral').length
     });
     
+    logFunctionExit('fetchCoinDeskNews', { count: newsItems.length });
+    endPerformanceTimer(timerId);
     return newsItems;
     
   } catch (error) {
-    console.error('❌ Error fetching news from CryptoCompare API:', error.message);
+    log('ERROR', 'Error fetching news from CryptoCompare API', error.message);
     
     if (error.response) {
-      console.error('📄 CryptoCompare API response:', {
+      logApiResponse({
         status: error.response.status,
         statusText: error.response.statusText,
-        headers: error.response.headers,
+        error: error.response.data,
+        context
+      });
+      
+      log('ERROR', 'CryptoCompare API response error:', {
+        status: error.response.status,
+        statusText: error.response.statusText,
         data: JSON.stringify(error.response.data).substring(0, 1000)
       });
     } else if (error.request) {
-      console.error('📄 CryptoCompare API request failed:', {
+      log('ERROR', 'CryptoCompare API request failed:', {
         url: error.config?.url,
         method: error.config?.method,
         timeout: error.config?.timeout
       });
     } else {
-      console.error('📄 CryptoCompare API error details:', error);
+      log('ERROR', 'CryptoCompare API error details', error);
     }
     
     // Return empty array on error - calling code can handle fallback
+    logFunctionExit('fetchCoinDeskNews', []);
+    endPerformanceTimer(timerId);
     return [];
   }
 }
 
 // Function to test CryptoCompare API connectivity
 export async function testCoinDeskAPI(): Promise<boolean> {
+  const timerId = startPerformanceTimer('testCoinDeskAPI');
+  logFunctionEntry('testCoinDeskAPI');
+  
   try {
-    console.log('🧪 Testing CryptoCompare News API connectivity...');
+    log('INFO', 'Testing CryptoCompare News API connectivity...');
     const testUrl = `https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=latest&limit=1`;
-    console.log(`🌐 Testing CryptoCompare URL: ${testUrl}`);
+    log('INFO', `Testing CryptoCompare URL: ${testUrl}`);
+    
+    logApiRequest({
+      endpoint: testUrl,
+      method: 'GET',
+      headers: {
+        'User-Agent': 'CryptoTrader-Bot/1.0',
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      context: 'test connection'
+    });
     
     const response = await axios.get(
       testUrl,
@@ -288,29 +343,49 @@ export async function testCoinDeskAPI(): Promise<boolean> {
       }
     );
     
-    console.log(`📊 CryptoCompare Test Response Status: ${response.status}`);
-    console.log(`📊 CryptoCompare Test Response Data:`, JSON.stringify(response.data).substring(0, 200));
+    logApiResponse({
+      status: response.status,
+      statusText: response.statusText,
+      data: response.data,
+      context: 'test connection'
+    });
+    
+    log('INFO', `CryptoCompare Test Response Status: ${response.status}`);
+    log('INFO', `CryptoCompare Test Response Data: ${JSON.stringify(response.data).substring(0, 200)}`);
     
     if (response.status === 200 && response.data && response.data.Data && Array.isArray(response.data.Data)) {
-      console.log('✅ CryptoCompare News API test successful');
+      log('INFO', 'CryptoCompare News API test successful');
+      logFunctionExit('testCoinDeskAPI', true);
+      endPerformanceTimer(timerId);
       return true;
     }
     
-    console.log('❌ CryptoCompare API test failed - invalid response structure');
-    console.log('📄 Expected: response.data.Data, Got:', typeof response.data, Object.keys(response.data || {}));
+    log('ERROR', 'CryptoCompare API test failed - invalid response structure');
+    log('ERROR', `Expected: response.data.Data, Got: ${typeof response.data}, Keys: ${Object.keys(response.data || {})}`);
+    logFunctionExit('testCoinDeskAPI', false);
+    endPerformanceTimer(timerId);
     return false;
     
   } catch (error) {
-    console.error('❌ CryptoCompare API test failed:', error.message);
+    log('ERROR', 'CryptoCompare API test failed', error.message);
     
     if (error.response) {
-      console.error('📄 Test response error:', {
+      logApiResponse({
+        status: error.response.status,
+        statusText: error.response.statusText,
+        error: error.response.data,
+        context: 'test connection'
+      });
+      
+      log('ERROR', 'Test response error:', {
         status: error.response.status,
         statusText: error.response.statusText,
         data: JSON.stringify(error.response.data).substring(0, 500)
       });
     }
     
+    logFunctionExit('testCoinDeskAPI', false);
+    endPerformanceTimer(timerId);
     return false;
   }
 }

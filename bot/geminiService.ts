@@ -1,7 +1,16 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { CryptoData, NewsItem, MarketConditions, TradingRecommendation } from '../src/types/trading.js';
-import { EnhancedDerivativesMarketData } from './derivativesDataService.js';
+import { CryptoData, NewsItem, MarketConditions, TradingRecommendation } from './types.js';
+import { EnhancedDerivativesMarketData } from './types.js';
 import dotenv from 'dotenv';
+import { 
+  logApiRequest, 
+  logApiResponse, 
+  startPerformanceTimer, 
+  endPerformanceTimer,
+  logFunctionEntry,
+  logFunctionExit,
+  log
+} from './utils/logger.js';
 
 dotenv.config();
 
@@ -23,46 +32,95 @@ export interface DerivativesTradeIdea {
 export async function generateGeminiRecommendations(
   cryptoData: CryptoData[],
   news?: NewsItem[],
-  marketConditions?: MarketConditions
+  marketConditions?: MarketConditions,
+  context?: string
 ): Promise<TradingRecommendation[]> {
+  const timerId = startPerformanceTimer('generateGeminiRecommendations');
+  logFunctionEntry('generateGeminiRecommendations', { 
+    cryptoCount: cryptoData.length, 
+    newsCount: news?.length || 0,
+    hasMarketConditions: !!marketConditions 
+  });
+  
   try {
-    console.log('🤖 Generating AI recommendations using Gemini...');
+    log('INFO', 'Generating AI recommendations using Gemini...');
     
     if (!process.env.GEMINI_API_KEY) {
-      console.error('❌ GEMINI_API_KEY is not configured');
+      log('ERROR', 'GEMINI_API_KEY is not configured');
+      logFunctionExit('generateGeminiRecommendations', []);
+      endPerformanceTimer(timerId);
       return [];
     }
 
     if (cryptoData.length === 0) {
-      console.error('❌ No crypto data provided for Gemini analysis');
+      log('ERROR', 'No crypto data provided for Gemini analysis');
+      logFunctionExit('generateGeminiRecommendations', []);
+      endPerformanceTimer(timerId);
       return [];
     }
 
     // Construct the prompt for Gemini
     const prompt = buildGeminiPrompt(cryptoData, news, marketConditions);
     
-    console.log('📝 Sending prompt to Gemini API...');
+    log('INFO', 'Sending prompt to Gemini API...');
+    
+    // Log API request (without sensitive data)
+    logApiRequest({
+      endpoint: 'Gemini AI API',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': '[REDACTED]'
+      },
+      body: {
+        model: 'gemini-2.0-flash-exp',
+        promptLength: prompt.length,
+        cryptoSymbols: cryptoData.map(c => c.symbol)
+      },
+      context
+    });
     
     // Generate content using Gemini
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
     
-    console.log('✅ Received response from Gemini API');
+    logApiResponse({
+      status: 200,
+      data: {
+        responseLength: text.length,
+        responsePreview: text.substring(0, 200) + '...'
+      },
+      context
+    });
     
-    // Parse the JSON response
+    log('INFO', 'Received response from Gemini API');
+    
     const recommendations = parseGeminiResponse(text, cryptoData);
     
     if (recommendations.length === 0) {
-      console.error('❌ Failed to parse valid recommendations from Gemini');
+      log('ERROR', 'Failed to parse valid recommendations from Gemini');
+      logFunctionExit('generateGeminiRecommendations', []);
+      endPerformanceTimer(timerId);
       return [];
     }
     
-    console.log(`🎯 Generated ${recommendations.length} AI recommendations`);
+    log('INFO', `Generated ${recommendations.length} AI recommendations`);
+    logFunctionExit('generateGeminiRecommendations', { count: recommendations.length });
+    endPerformanceTimer(timerId);
     return recommendations;
     
   } catch (error) {
-    console.error('❌ Error generating Gemini recommendations:', error.message);
+    log('ERROR', 'Error generating Gemini recommendations', error.message);
+    
+    logApiResponse({
+      status: 500,
+      error: error.message,
+      context
+    });
+    
+    logFunctionExit('generateGeminiRecommendations', []);
+    endPerformanceTimer(timerId);
     return [];
   }
 }
@@ -132,6 +190,11 @@ Ensure all prices are realistic numbers without commas, confidence is 0-100, act
 }
 
 function parseGeminiResponse(text: string, cryptoData: CryptoData[]): TradingRecommendation[] {
+  logFunctionEntry('parseGeminiResponse', { 
+    textLength: text.length, 
+    cryptoCount: cryptoData.length 
+  });
+  
   try {
     // Clean the response text to extract JSON
     let jsonText = text.trim();
@@ -157,7 +220,7 @@ function parseGeminiResponse(text: string, cryptoData: CryptoData[]): TradingRec
     // Extract only the JSON array part
     jsonText = jsonText.substring(startIndex, lastIndex + 1);
     
-    console.log('🔍 Cleaned JSON for parsing:', jsonText.substring(0, 200) + '...');
+    log('INFO', 'Cleaned JSON for parsing:', jsonText.substring(0, 200) + '...');
     
     // Parse the JSON
     const recommendations: TradingRecommendation[] = JSON.parse(jsonText);
@@ -181,13 +244,14 @@ function parseGeminiResponse(text: string, cryptoData: CryptoData[]): TradingRec
       }))
       .filter(rec => cryptoData.some(crypto => crypto.symbol === rec.crypto));
     
-    console.log(`✅ Parsed ${validRecommendations.length} valid recommendations from Gemini`);
+    log('INFO', `Parsed ${validRecommendations.length} valid recommendations from Gemini`);
+    logFunctionExit('parseGeminiResponse', { count: validRecommendations.length });
     return validRecommendations;
     
   } catch (error) {
-    console.error('❌ Error parsing Gemini response:', error.message);
-    console.log('📄 Raw response (first 500 chars):', text.substring(0, 500) + '...');
-    console.log('📄 Raw response (last 500 chars):', '...' + text.substring(Math.max(0, text.length - 500)));
+    log('ERROR', 'Error parsing Gemini response', error.message);
+    log('ERROR', 'Raw response (first 500 chars):', text.substring(0, 500) + '...');
+    log('ERROR', 'Raw response (last 500 chars):', '...' + text.substring(Math.max(0, text.length - 500)));
     
     // Try to extract partial JSON if possible
     try {
@@ -231,11 +295,11 @@ function parseGeminiResponse(text: string, cryptoData: CryptoData[]): TradingRec
         
         if (endIndex !== -1) {
           const partialJson = text.substring(startIndex, endIndex + 1);
-          console.log('🔄 Attempting to parse partial JSON...');
+          log('INFO', 'Attempting to parse partial JSON...');
           const partialRecommendations = JSON.parse(partialJson);
           
           if (Array.isArray(partialRecommendations) && partialRecommendations.length > 0) {
-            console.log('✅ Successfully parsed partial JSON with', partialRecommendations.length, 'recommendations');
+            log('INFO', `Successfully parsed partial JSON with ${partialRecommendations.length} recommendations`);
             
             // Apply the same validation as above
             const validRecommendations = partialRecommendations
@@ -253,55 +317,105 @@ function parseGeminiResponse(text: string, cryptoData: CryptoData[]): TradingRec
               .filter(rec => cryptoData.some(crypto => crypto.symbol === rec.crypto));
             
             if (validRecommendations.length > 0) {
+              logFunctionExit('parseGeminiResponse', { count: validRecommendations.length });
               return validRecommendations;
             }
           }
         }
       }
     } catch (partialError) {
-      console.log('❌ Partial JSON parsing also failed:', partialError.message);
+      log('ERROR', 'Partial JSON parsing also failed', partialError.message);
     }
     
+    logFunctionExit('parseGeminiResponse', []);
     return [];
   }
 }
 
 export async function generateDerivativesTradeIdea(
-  marketData: EnhancedDerivativesMarketData
+  marketData: EnhancedDerivativesMarketData,
+  context?: string
 ): Promise<DerivativesTradeIdea | null> {
+  const timerId = startPerformanceTimer('generateDerivativesTradeIdea');
+  logFunctionEntry('generateDerivativesTradeIdea', { symbol: marketData.symbol });
+  
   try {
-    console.log(`🤖 Generating derivatives trade idea for ${marketData.symbol} using Gemini...`);
+    log('INFO', `Generating derivatives trade idea for ${marketData.symbol} using Gemini...`);
     
     if (!process.env.GEMINI_API_KEY) {
-      console.error('❌ GEMINI_API_KEY is not configured');
+      log('ERROR', 'GEMINI_API_KEY is not configured');
+      logFunctionExit('generateDerivativesTradeIdea', null);
+      endPerformanceTimer(timerId);
       return null;
     }
 
     // Construct the prompt for derivatives trade analysis
     const prompt = buildEnhancedDerivativesTradePrompt(marketData);
     
-    console.log('📝 Sending derivatives trade prompt to Gemini API...');
+    log('INFO', 'Sending derivatives trade prompt to Gemini API...');
+    
+    // Log API request (without sensitive data)
+    logApiRequest({
+      endpoint: 'Gemini AI API (Derivatives)',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': '[REDACTED]'
+      },
+      body: {
+        model: 'gemini-2.0-flash-exp',
+        promptLength: prompt.length,
+        symbol: marketData.symbol,
+        timeframes: Object.keys(marketData.timeframes)
+      },
+      context
+    });
     
     // Generate content using Gemini
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
     
-    console.log('✅ Received derivatives trade response from Gemini API');
+    logApiResponse({
+      status: 200,
+      data: {
+        responseLength: text.length,
+        responsePreview: text.substring(0, 200) + '...'
+      },
+      context
+    });
+    
+    log('INFO', 'Received derivatives trade response from Gemini API');
     
     // Parse the JSON response
     const tradeIdea = parseDerivativesTradeResponse(text, marketData);
     
     if (!tradeIdea) {
-      console.error('❌ Failed to parse valid trade idea from Gemini');
+      log('ERROR', 'Failed to parse valid trade idea from Gemini');
+      logFunctionExit('generateDerivativesTradeIdea', null);
+      endPerformanceTimer(timerId);
       return null;
     }
     
-    console.log(`🎯 Generated derivatives trade idea: ${tradeIdea.direction.toUpperCase()} ${tradeIdea.symbol}`);
+    log('INFO', `Generated derivatives trade idea: ${tradeIdea.direction.toUpperCase()} ${tradeIdea.symbol}`);
+    logFunctionExit('generateDerivativesTradeIdea', { 
+      direction: tradeIdea.direction, 
+      confidence: tradeIdea.confidence 
+    });
+    endPerformanceTimer(timerId);
     return tradeIdea;
     
   } catch (error) {
-    console.error('❌ Error generating derivatives trade idea:', error.message);
+    log('ERROR', 'Error generating derivatives trade idea', error.message);
+    
+    logApiResponse({
+      status: 500,
+      error: error.message,
+      context
+    });
+    
+    logFunctionExit('generateDerivativesTradeIdea', null);
+    endPerformanceTimer(timerId);
     return null;
   }
 }
@@ -317,6 +431,7 @@ DATA:
     "dataTimestamp": "${marketData.dataTimestamp}",
     "4-HOUR TIMEFRAME ANALYSIS": {
       "Current Price": ${timeframes['4h'].indicators.currentPrice.toFixed(5)},
+      "Market Regime": "${timeframes['4h'].marketRegime}",
       "RSI (14)": ${timeframes['4h'].indicators.rsi.toFixed(1)},
       "RSI Trend": "${timeframes['4h'].indicators.rsiTrend}",
       "MACD": ${timeframes['4h'].indicators.macd.macd.toFixed(2)},
@@ -332,12 +447,28 @@ DATA:
       "EMA Trend": "${timeframes['4h'].indicators.emaTrend}",
       "Support Levels": [${timeframes['4h'].indicators.support.map(s => s.toFixed(5)).join(', ')}],
       "Resistance Levels": [${timeframes['4h'].indicators.resistance.map(r => r.toFixed(5)).join(', ')}],
+      "Fibonacci Retracement": {
+        "Swing High (0%)": ${timeframes['4h'].indicators.fibonacci.retracement.level_0.toFixed(5)},
+        "23.6%": ${timeframes['4h'].indicators.fibonacci.retracement.level_236.toFixed(5)},
+        "38.2%": ${timeframes['4h'].indicators.fibonacci.retracement.level_382.toFixed(5)},
+        "50%": ${timeframes['4h'].indicators.fibonacci.retracement.level_500.toFixed(5)},
+        "61.8%": ${timeframes['4h'].indicators.fibonacci.retracement.level_618.toFixed(5)},
+        "78.6%": ${timeframes['4h'].indicators.fibonacci.retracement.level_786.toFixed(5)},
+        "Swing Low (100%)": ${timeframes['4h'].indicators.fibonacci.retracement.level_1000.toFixed(5)}
+      },
+      "Fibonacci Extension": {
+        "127.2%": ${timeframes['4h'].indicators.fibonacci.extension.level_1272.toFixed(5)},
+        "161.8%": ${timeframes['4h'].indicators.fibonacci.extension.level_1618.toFixed(5)},
+        "261.8%": ${timeframes['4h'].indicators.fibonacci.extension.level_2618.toFixed(5)}
+      },
+      "Fibonacci Trend": "${timeframes['4h'].indicators.fibonacci.trend}",
       "Recent Candles (OHLCV)": [${timeframes['4h'].price.recentOHLCV.slice(-3).map(c => 
         `{"O": ${c.open.toFixed(5)}, "H": ${c.high.toFixed(5)}, "L": ${c.low.toFixed(5)}, "C": ${c.close.toFixed(5)}, "V": ${c.volume.toFixed(0)}}`
       ).join(', ')}]
     },
     "1-HOUR TIMEFRAME ANALYSIS": {
       "Current Price": ${timeframes['1h'].indicators.currentPrice.toFixed(5)},
+      "Market Regime": "${timeframes['1h'].marketRegime}",
       "RSI (14)": ${timeframes['1h'].indicators.rsi.toFixed(1)},
       "RSI Trend": "${timeframes['1h'].indicators.rsiTrend}",
       "MACD": ${timeframes['1h'].indicators.macd.macd.toFixed(2)},
@@ -353,6 +484,21 @@ DATA:
       "EMA Trend": "${timeframes['1h'].indicators.emaTrend}",
       "Support Levels": [${timeframes['1h'].indicators.support.map(s => s.toFixed(5)).join(', ')}],
       "Resistance Levels": [${timeframes['1h'].indicators.resistance.map(r => r.toFixed(5)).join(', ')}],
+      "Fibonacci Retracement": {
+        "Swing High (0%)": ${timeframes['1h'].indicators.fibonacci.retracement.level_0.toFixed(5)},
+        "23.6%": ${timeframes['1h'].indicators.fibonacci.retracement.level_236.toFixed(5)},
+        "38.2%": ${timeframes['1h'].indicators.fibonacci.retracement.level_382.toFixed(5)},
+        "50%": ${timeframes['1h'].indicators.fibonacci.retracement.level_500.toFixed(5)},
+        "61.8%": ${timeframes['1h'].indicators.fibonacci.retracement.level_618.toFixed(5)},
+        "78.6%": ${timeframes['1h'].indicators.fibonacci.retracement.level_786.toFixed(5)},
+        "Swing Low (100%)": ${timeframes['1h'].indicators.fibonacci.retracement.level_1000.toFixed(5)}
+      },
+      "Fibonacci Extension": {
+        "127.2%": ${timeframes['1h'].indicators.fibonacci.extension.level_1272.toFixed(5)},
+        "161.8%": ${timeframes['1h'].indicators.fibonacci.extension.level_1618.toFixed(5)},
+        "261.8%": ${timeframes['1h'].indicators.fibonacci.extension.level_2618.toFixed(5)}
+      },
+      "Fibonacci Trend": "${timeframes['1h'].indicators.fibonacci.trend}",
       "Recent Candles (OHLCV)": [${timeframes['1h'].price.recentOHLCV.slice(-3).map(c => 
         `{"O": ${c.open.toFixed(5)}, "H": ${c.high.toFixed(5)}, "L": ${c.low.toFixed(5)}, "C": ${c.close.toFixed(5)}, "V": ${c.volume.toFixed(0)}}`
       ).join(', ')}]
@@ -371,13 +517,15 @@ INSTRUCTIONS FOR ANALYSIS:
 **Expert Analytical Process:** Apply a systematic, top-down multi-timeframe analysis, prioritizing capital preservation.
 
 **Step 1: Establish Primary Trend (4-Hour Timeframe - Highest Priority):**
- - Analyze the 4-hour EMA trend, MACD trend, and recent OHLCV to determine the dominant market direction (bullish, bearish, or ranging).
+ - Analyze the 4-hour Market Regime, EMA trend, MACD trend, and recent OHLCV to determine the dominant market direction (bullish, bearish, or ranging).
  - Identify major 4-hour support and resistance levels. This timeframe provides the foundational context; all subsequent lower timeframe analysis MUST align with this primary trend for a high-confidence trade idea.
+ - Consider 4-hour Fibonacci levels as critical price zones. Price reactions at key Fibonacci retracement levels (38.2%, 50%, 61.8%) or extension levels can provide high-probability entry/exit points.
  - *Self-assessment:* Is the 4-hour trend direction clear and unambiguous? If not, note the ambiguity as a potential reason for a 'No Trade Idea'.
 
 **Step 2: Confirm Momentum and Setup (1-Hour Timeframe - Secondary Priority):**
- - Analyze the 1-hour EMA trend, MACD, and RSI. Crucially, assess if these indicators and their trends *align* with the established 4-hour trend. Strong alignment across timeframes is paramount for high confidence.
+ - Analyze the 1-hour Market Regime, EMA trend, MACD, and RSI. Crucially, assess if these indicators and their trends *align* with the established 4-hour trend. Strong alignment across timeframes is paramount for high confidence.
  - Identify key 1-hour support and resistance levels. Observe price action (OHLCV) reacting to or approaching these levels.
+ - Examine 1-hour Fibonacci levels for precise entry timing. Look for confluence between Fibonacci levels and other support/resistance zones.
  - Evaluate 1-hour RSI trend (rising/falling) and its position relative to overbought (70) and oversold (30) thresholds. A rising RSI from below 30 is a stronger bullish signal than a rising RSI above 70, which may indicate overextension and potential reversal.
  - Analyze 1-hour MACD for bullish/bearish crossovers and the histogram's trend (increasing/decreasing momentum). Confirm if it is reinforcing momentum in the direction of the 4-hour trend.
  - Interpret Bollinger Bands: Are they expanding (increasing volatility) or contracting (decreasing volatility)? Is price breaking out or consolidating within the bands?
@@ -390,13 +538,16 @@ INSTRUCTIONS FOR ANALYSIS:
 
 **Step 4: Confluence Assessment and Explicit Signal Weighting:**
  - Systematically weigh the strength of each aligned signal. Assign the *highest importance* to Multi-Timeframe Trend Alignment (4h and 1h in same direction) and Volume Confirmation.
+ - Assign *very high importance* to Market Regime alignment across timeframes and Fibonacci level confluences with support/resistance.
  - Assign *medium importance* to strong momentum indicator alignment (RSI trend, MACD crossover/histogram) and price action at key support/resistance levels.
  - Assign *lower importance* to individual candlestick patterns unless they occur at critical support/resistance with strong volume.
+ - Pay special attention to Fibonacci retracement levels during trending markets and extension levels during breakout scenarios.
  - Identify the strongest technical setup by assessing the overall confluence of aligned, weighted signals. A setup with 3-5 strongly confirming indicators is generally more successful.
  - *Self-assessment:* Is there overwhelming, weighted evidence for a clear directional bias? Or are signals mixed, ambiguous, or lacking sufficient confluence?
 
 **Step 5: Risk Management and Decision Formulation:**
  - Based on the strongest setup and its confluence, determine the optimal entry price. Consider current market structure and recent price action (e.g., a pullback to a key EMA or established support/resistance level).
+ - Use Fibonacci levels as precise entry and exit points. For example, enter long positions at 61.8% retracement in uptrends, or target extension levels for profit-taking.
  - Precisely place the stop-loss using multiple support/resistance levels to ensure robust risk management and minimize potential losses.
  - Calculate the Risk-Reward Ratio. If the calculated ratio is less than 2:1, the trade idea is considered invalid for a high-confidence setup. In such cases, state 'No Trade Idea'.
  - *Self-assessment:* Is the proposed trade idea robust from a risk management perspective? Does it meet the minimum 2:1 risk-reward ratio? Is capital preservation prioritized?
@@ -409,10 +560,14 @@ INSTRUCTIONS FOR ANALYSIS:
 
 IMPORTANT NOTES:
 - Use TREND analysis (rising/falling RSI, MACD trend, Bollinger expansion/contraction) with full contextual awareness.
+ Use MARKET REGIME analysis as the primary context, then apply TREND analysis (rising/falling RSI, MACD trend, Bollinger expansion/contraction) with full contextual awareness.
+ Prioritize FIBONACCI CONFLUENCES - when multiple Fibonacci levels align with support/resistance or when price is reacting at key Fibonacci zones.
 - Consider VOLUME CONFIRMATION (significantly above average volume on trending moves = higher confidence) as a critical validation.
 - Focus on RECENT PRICE ACTION from candlestick data, especially reactions at support/resistance.
+ Focus on RECENT PRICE ACTION from candlestick data, especially reactions at support/resistance and Fibonacci levels.
 - Ensure risk-reward ratio is at least 2:1 for all high-confidence trades.
 - Maintain HIGH PRECISION for all prices (up to 5 decimal places for accuracy).
+ Use Fibonacci levels for precise entry/exit targeting and risk management.
 
 **<output>**
 Respond ONLY with a valid JSON object in this exact format:
@@ -422,10 +577,17 @@ Respond ONLY with a valid JSON object in this exact format:
 - If 'direction' is 'no_trade_due_to_conflict', set 'entry', 'stopLoss', and 'riskReward' to 0.0, and 'confidence' to 'N/A' or below 75%, with 'technicalReasoning' explaining the lack of a clear setup or conflicting signals.
 - 'confidence' must be between 75-95 for high-quality setups. 'riskReward' is a decimal (e.g., 3.0).
 - 'technicalReasoning' must contain 5-6 items, explicitly focusing on multi-timeframe analysis, trend alignment, momentum, and volume confirmation, ordered by their impact on the decision.
+- Keep each 'technicalReasoning' item under 120 characters to fit Discord message limits.
+ 'technicalReasoning' must contain 5-6 items, explicitly focusing on market regime alignment, multi-timeframe analysis, Fibonacci confluences, trend alignment, momentum, and volume confirmation, ordered by their impact on the decision.
 **</output>**`;
 }
 
 function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivativesMarketData): DerivativesTradeIdea | null {
+  logFunctionEntry('parseDerivativesTradeResponse', { 
+    textLength: text.length, 
+    symbol: marketData.symbol 
+  });
+  
   try {
     // Clean the response text to extract JSON
     let jsonText = text.trim();
@@ -451,21 +613,26 @@ function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivat
     // Extract only the JSON object part
     jsonText = jsonText.substring(startIndex, lastIndex + 1);
     
-    console.log('🔍 Cleaned JSON for parsing:', jsonText.substring(0, 200) + '...');
+    log('INFO', 'Cleaned JSON for parsing:', jsonText.substring(0, 200) + '...');
     
     // Parse the JSON
     const tradeData = JSON.parse(jsonText);
     
     // Handle the new "no_trade_due_to_c\onflict" direction
     if (tradeData.direction === 'no_trade_due_to_conflict') {
-      console.log('⚠️ AI determined no trade due to conflicting signals');
+      log('WARN', 'AI determined no trade due to conflicting signals');
+      logFunctionExit('parseDerivativesTradeResponse', { direction: 'no_trade' });
       return {
         direction: 'long', // Default to long for display purposes
         entry: 0,
         stopLoss: 0,
         riskReward: 0,
         confidence: 0,
-        technicalReasoning: tradeData.technicalReasoning || ['No high-probability setup identified due to conflicting signals'],
+        technicalReasoning: tradeData.technicalReasoning 
+          ? tradeData.technicalReasoning.map(reason => 
+              reason.length > 150 ? reason.substring(0, 150) + '...' : reason
+            ).slice(0, 4) // Limit to 4 reasons max
+          : ['No high-probability setup identified due to conflicting signals'],
         symbol: marketData.symbol,
         timeframe: 'No trade recommended'
       };
@@ -493,12 +660,14 @@ function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivat
       timeframe: tradeData.timeframe || '6-24 hours'
     };
     
-    console.log(`✅ Parsed derivatives trade idea: ${tradeIdea.direction.toUpperCase()} ${tradeIdea.symbol} at $${tradeIdea.entry.toFixed(5)} (Confidence: ${tradeIdea.confidence}%)`);
+    log('INFO', `Parsed derivatives trade idea: ${tradeIdea.direction.toUpperCase()} ${tradeIdea.symbol} at $${tradeIdea.entry.toFixed(5)} (Confidence: ${tradeIdea.confidence}%)`);
+    logFunctionExit('parseDerivativesTradeResponse', tradeIdea);
     return tradeIdea;
     
   } catch (error) {
-    console.error('❌ Error parsing derivatives trade response:', error.message);
-    console.log('📄 Raw response (first 500 chars):', text.substring(0, 500) + '...');
+    log('ERROR', 'Error parsing derivatives trade response', error.message);
+    log('ERROR', 'Raw response (first 500 chars):', text.substring(0, 500) + '...');
+    logFunctionExit('parseDerivativesTradeResponse', null);
     return null;
   }
 }

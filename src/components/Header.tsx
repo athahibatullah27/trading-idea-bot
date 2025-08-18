@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, Bot, Activity } from 'lucide-react';
+import { Bot, Target } from 'lucide-react';
 
 export function Header() {
   return (
@@ -10,19 +10,15 @@ export function Header() {
             <Bot className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white">CryptoTrader Bot</h1>
-            <p className="text-sm text-gray-400">AI-Powered Trading Analysis</p>
+            <h1 className="text-xl font-bold text-white">Trade Recommendation Evaluator</h1>
+            <p className="text-sm text-gray-400">Track AI Trading Performance</p>
           </div>
         </div>
         
         <div className="flex items-center space-x-6">
           <div className="flex items-center space-x-2">
-            <Activity className="w-4 h-4 text-green-400" />
-            <span className="text-sm text-green-400 font-medium">Live Analysis</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <TrendingUp className="w-4 h-4 text-blue-400" />
-            <span className="text-sm text-gray-300">Last updated: 2 min ago</span>
+            <Target className="w-4 h-4 text-blue-400" />
+            <span className="text-sm text-gray-300">Evaluation Dashboard</span>
           </div>
         </div>
       </div>

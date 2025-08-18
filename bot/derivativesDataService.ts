@@ -1,88 +1,37 @@
 import axios from 'axios';
+import { 
+  TechnicalIndicators, 
+  TimeframeData, 
+  EnhancedDerivativesMarketData,
+  FibonacciLevels, 
+  CandlestickData
+} from './types.js';
+import { 
+  logApiRequest, 
+  logApiResponse, 
+  startPerformanceTimer, 
+  endPerformanceTimer,
+  logFunctionEntry,
+  logFunctionExit,
+  log
+} from './utils/logger.js';
 
 // Binance Futures API configuration
 const BINANCE_FUTURES_API_BASE = 'https://fapi.binance.com';
 
-export interface CandlestickData {
-  openTime: number;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-  closeTime: number;
-  quoteAssetVolume: number;
-  numberOfTrades: number;
-  takerBuyBaseAssetVolume: number;
-  takerBuyQuoteAssetVolume: number;
-}
-
-export interface TechnicalIndicators {
-  rsi: number;
-  rsiTrend: 'rising' | 'falling' | 'flat';
-  macd: {
-    macd: number;
-    signal: number;
-    histogram: number;
-    trend: 'rising' | 'falling' | 'flat';
-  };
-  bollinger: {
-    upper: number;
-    middle: number;
-    lower: number;
-    trend: 'expanding' | 'contracting' | 'flat';
-  };
-  ema20: number;
-  ema50: number;
-  emaTrend: 'bullish' | 'bearish' | 'neutral';
-  support: number[];
-  resistance: number[];
-  currentPrice: number;
-  priceChange24h: number;
-  volume24h: number;
-  volumeTrend: 'significantly above average' | 'above average' | 'average' | 'below average';
-  averageVolume: number;
-}
-
-export interface TimeframeData {
-  timeframe: string;
-  price: {
-    currentPrice: number;
-    recentOHLCV: Array<{
-      open: number;
-      high: number;
-      low: number;
-      close: number;
-      volume: number;
-      timestamp: number;
-    }>;
-  };
-  indicators: TechnicalIndicators;
-}
-
-export interface EnhancedDerivativesMarketData {
-  symbol: string;
-  dataTimestamp: string;
-  timeframes: {
-    '4h': TimeframeData;
-    '1h': TimeframeData;
-  };
-  market: {
-    fundingRate: number;
-    volume24h: number;
-    volumeTrend: string;
-    averageVolume: number;
-  };
-}
 
 // Function to fetch candlestick data from Binance Futures
 export async function fetchCandlestickData(
   symbol: string, 
   interval: string = '1h', 
-  limit: number = 100
+  limit: number = 100,
+  context?: string
 ): Promise<CandlestickData[]> {
+  const timerId = startPerformanceTimer('fetchCandlestickData');
+  logFunctionEntry('fetchCandlestickData', { symbol, interval, limit });
+  
   try {
-    console.log(`📊 Fetching ${limit} ${interval} candlesticks for ${symbol} from Binance Futures...`);
+    log('INFO', `Fetching ${limit} ${interval} candlesticks for ${symbol} from Binance Futures...`);
     
     const url = `${BINANCE_FUTURES_API_BASE}/fapi/v1/klines`;
     const params = {
@@ -90,6 +39,16 @@ export async function fetchCandlestickData(
       interval,
       limit
     };
+    
+    logApiRequest({
+      endpoint: url,
+      method: 'GET',
+      params,
+      headers: {
+        'User-Agent': 'CryptoTrader-Bot/1.0'
+      },
+      context
+    });
     
     const response = await axios.get(url, {
       params,
@@ -99,7 +58,16 @@ export async function fetchCandlestickData(
       }
     });
     
+    logApiResponse({
+      status: response.status,
+      statusText: response.statusText,
+      data: response.data,
+      context
+    });
+    
     if (!response.data || !Array.isArray(response.data)) {
+      logFunctionExit('fetchCandlestickData', []);
+      endPerformanceTimer(timerId);
       throw new Error('Invalid response format from Binance API');
     }
     
@@ -117,11 +85,25 @@ export async function fetchCandlestickData(
       takerBuyQuoteAssetVolume: parseFloat(candle[10])
     }));
     
-    console.log(`✅ Successfully fetched ${candlesticks.length} candlesticks for ${symbol} (${interval})`);
+    log('INFO', `Successfully fetched ${candlesticks.length} candlesticks for ${symbol} (${interval})`);
+    logFunctionExit('fetchCandlestickData', { count: candlesticks.length });
+    endPerformanceTimer(timerId);
     return candlesticks;
     
   } catch (error) {
-    console.error(`❌ Error fetching candlestick data for ${symbol} (${interval}):`, error.message);
+    log('ERROR', `Error fetching candlestick data for ${symbol} (${interval})`, error.message);
+    
+    if (error.response) {
+      logApiResponse({
+        status: error.response.status,
+        statusText: error.response.statusText,
+        error: error.response.data,
+        context
+      });
+    }
+    
+    logFunctionExit('fetchCandlestickData', []);
+    endPerformanceTimer(timerId);
     throw error;
   }
 }
@@ -342,6 +324,212 @@ function findMultipleSupportResistance(candlesticks: CandlestickData[]): { suppo
   return { support, resistance };
 }
 
+// Function to calculate Fibonacci retracement and extension levels
+function calculateFibonacciLevels(candlesticks: CandlestickData[]): {
+  retracement: {
+    level_0: number;
+    level_236: number;
+    level_382: number;
+    level_500: number;
+    level_618: number;
+    level_786: number;
+    level_1000: number;
+  };
+  extension: {
+    level_1272: number;
+    level_1618: number;
+    level_2618: number;
+  };
+  swingHigh: number;
+  swingLow: number;
+  trend: 'bullish_retracement' | 'bearish_retracement' | 'extension_phase' | 'no_clear_swing';
+} {
+  if (candlesticks.length < 20) {
+    const currentPrice = candlesticks[candlesticks.length - 1].close;
+    return {
+      retracement: {
+        level_0: currentPrice * 1.05,
+        level_236: currentPrice * 1.038,
+        level_382: currentPrice * 1.024,
+        level_500: currentPrice * 1.012,
+        level_618: currentPrice * 0.995,
+        level_786: currentPrice * 0.978,
+        level_1000: currentPrice * 0.95
+      },
+      extension: {
+        level_1272: currentPrice * 1.08,
+        level_1618: currentPrice * 1.12,
+        level_2618: currentPrice * 1.25
+      },
+      swingHigh: currentPrice * 1.05,
+      swingLow: currentPrice * 0.95,
+      trend: 'no_clear_swing'
+    };
+  }
+
+  // Find significant swing high and swing low using a 10-candle window
+  let swingHigh = 0;
+  let swingLow = Number.MAX_VALUE;
+  let swingHighIndex = -1;
+  let swingLowIndex = -1;
+
+  // Look for swing points in the last 50 candles for better significance
+  const lookbackPeriod = Math.min(50, candlesticks.length);
+  const startIndex = candlesticks.length - lookbackPeriod;
+
+  for (let i = startIndex + 5; i < candlesticks.length - 5; i++) {
+    const current = candlesticks[i];
+    
+    // Check for swing high (highest point in 5-candle window on each side)
+    let isSwingHigh = true;
+    for (let j = i - 5; j <= i + 5; j++) {
+      if (j !== i && candlesticks[j].high >= current.high) {
+        isSwingHigh = false;
+        break;
+      }
+    }
+    
+    // Check for swing low (lowest point in 5-candle window on each side)
+    let isSwingLow = true;
+    for (let j = i - 5; j <= i + 5; j++) {
+      if (j !== i && candlesticks[j].low <= current.low) {
+        isSwingLow = false;
+        break;
+      }
+    }
+    
+    if (isSwingHigh && current.high > swingHigh) {
+      swingHigh = current.high;
+      swingHighIndex = i;
+    }
+    
+    if (isSwingLow && current.low < swingLow) {
+      swingLow = current.low;
+      swingLowIndex = i;
+    }
+  }
+
+  // If no clear swings found, use recent high/low
+  if (swingHigh === 0 || swingLow === Number.MAX_VALUE) {
+    const recentCandles = candlesticks.slice(-20);
+    swingHigh = Math.max(...recentCandles.map(c => c.high));
+    swingLow = Math.min(...recentCandles.map(c => c.low));
+  }
+
+  const currentPrice = candlesticks[candlesticks.length - 1].close;
+  const range = swingHigh - swingLow;
+
+  // Determine trend based on swing timing and current price position
+  let trend: 'bullish_retracement' | 'bearish_retracement' | 'extension_phase' | 'no_clear_swing' = 'no_clear_swing';
+  
+  if (swingHighIndex > swingLowIndex) {
+    // Most recent swing is high, likely in bearish retracement
+    if (currentPrice < swingHigh && currentPrice > swingLow) {
+      trend = 'bearish_retracement';
+    } else if (currentPrice < swingLow) {
+      trend = 'extension_phase';
+    }
+  } else if (swingLowIndex > swingHighIndex) {
+    // Most recent swing is low, likely in bullish retracement
+    if (currentPrice > swingLow && currentPrice < swingHigh) {
+      trend = 'bullish_retracement';
+    } else if (currentPrice > swingHigh) {
+      trend = 'extension_phase';
+    }
+  }
+
+  // Calculate Fibonacci retracement levels
+  const retracement = {
+    level_0: swingHigh,                           // 0% - Swing High
+    level_236: swingHigh - (range * 0.236),      // 23.6%
+    level_382: swingHigh - (range * 0.382),      // 38.2%
+    level_500: swingHigh - (range * 0.500),      // 50%
+    level_618: swingHigh - (range * 0.618),      // 61.8%
+    level_786: swingHigh - (range * 0.786),      // 78.6%
+    level_1000: swingLow                         // 100% - Swing Low
+  };
+
+  // Calculate Fibonacci extension levels (beyond the swing range)
+  const extension = {
+    level_1272: swingLow - (range * 0.272),      // 127.2%
+    level_1618: swingLow - (range * 0.618),      // 161.8%
+    level_2618: swingLow - (range * 1.618)       // 261.8%
+  };
+
+  return {
+    retracement,
+    extension,
+    swingHigh,
+    swingLow,
+    trend
+  };
+}
+
+// Function to identify market regime based on technical indicators
+function identifyMarketRegime(indicators: TechnicalIndicators): 'trending_bullish' | 'trending_bearish' | 'ranging_volatile' | 'ranging_quiet' | 'consolidation' | 'breakout_pending' {
+  const {
+    rsi,
+    rsiTrend,
+    macd,
+    bollinger,
+    emaTrend,
+    currentPrice,
+    volumeTrend,
+    priceChange24h
+  } = indicators;
+
+  // Determine if market is trending or ranging
+  const isTrending = emaTrend !== 'neutral' && 
+                    (macd.trend === 'rising' || macd.trend === 'falling') &&
+                    Math.abs(priceChange24h) > 2; // Significant price movement
+
+  const isVolatile = bollinger.trend === 'expanding' || 
+                    (volumeTrend === 'significantly above average' || volumeTrend === 'above average') ||
+                    Math.abs(priceChange24h) > 5;
+
+  const isQuiet = bollinger.trend === 'contracting' && 
+                 volumeTrend === 'below average' &&
+                 Math.abs(priceChange24h) < 1;
+
+  // Check for potential breakout conditions
+  const isBreakoutPending = bollinger.trend === 'contracting' && 
+                           volumeTrend === 'above average' &&
+                           (rsi > 45 && rsi < 55) && // RSI in neutral zone
+                           Math.abs(priceChange24h) < 2;
+
+  // Check for consolidation (price near Bollinger middle, low volatility)
+  const isConsolidation = Math.abs(currentPrice - indicators.bollinger.middle) / indicators.bollinger.middle < 0.01 &&
+                         bollinger.trend === 'contracting' &&
+                         Math.abs(priceChange24h) < 1.5;
+
+  // Determine regime based on conditions
+  if (isBreakoutPending) {
+    return 'breakout_pending';
+  }
+  
+  if (isConsolidation) {
+    return 'consolidation';
+  }
+  
+  if (isTrending) {
+    if (emaTrend === 'bullish' && macd.macd > macd.signal && rsiTrend === 'rising') {
+      return 'trending_bullish';
+    } else if (emaTrend === 'bearish' && macd.macd < macd.signal && rsiTrend === 'falling') {
+      return 'trending_bearish';
+    }
+  }
+  
+  // If not clearly trending, determine ranging type
+  if (isVolatile) {
+    return 'ranging_volatile';
+  } else if (isQuiet) {
+    return 'ranging_quiet';
+  }
+  
+  // Default to ranging volatile if conditions are mixed
+  return 'ranging_volatile';
+}
+
 // Function to calculate volume trend
 function calculateVolumeTrend(candlesticks: CandlestickData[]): { volumeTrend: 'significantly above average' | 'above average' | 'average' | 'below average'; averageVolume: number } {
   if (candlesticks.length < 7) {
@@ -392,6 +580,7 @@ export function calculateEnhancedTechnicalIndicators(candlesticks: CandlestickDa
   const ema50 = calculateEMA(closePrices, 50);
   const { support, resistance } = findMultipleSupportResistance(candlesticks);
   const { volumeTrend, averageVolume } = calculateVolumeTrend(candlesticks);
+  const fibonacciLevels = calculateFibonacciLevels(candlesticks);
   
   // Determine EMA trend
   let emaTrend: 'bullish' | 'bearish' | 'neutral' = 'neutral';
@@ -418,6 +607,7 @@ export function calculateEnhancedTechnicalIndicators(candlesticks: CandlestickDa
     emaTrend,
     support,
     resistance,
+    fibonacci: fibonacciLevels,
     currentPrice,
     priceChange24h,
     volume24h,
@@ -427,19 +617,26 @@ export function calculateEnhancedTechnicalIndicators(candlesticks: CandlestickDa
 }
 
 // Function to get enhanced multi-timeframe derivatives market data
-export async function getEnhancedDerivativesMarketData(symbol: string): Promise<EnhancedDerivativesMarketData> {
+export async function getEnhancedDerivativesMarketData(symbol: string, context?: string): Promise<EnhancedDerivativesMarketData> {
+  const timerId = startPerformanceTimer('getEnhancedDerivativesMarketData');
+  logFunctionEntry('getEnhancedDerivativesMarketData', { symbol });
+  
   try {
-    console.log(`🔄 Fetching enhanced multi-timeframe market data for ${symbol}...`);
+    log('INFO', `Fetching enhanced multi-timeframe market data for ${symbol}...`);
     
     // Fetch candlestick data for both timeframes
     const [candlesticks4h, candlesticks1h] = await Promise.all([
-      fetchCandlestickData(symbol, '4h', 100),
-      fetchCandlestickData(symbol, '1h', 200) // More data for better volume analysis
+      fetchCandlestickData(symbol, '4h', 100, context),
+      fetchCandlestickData(symbol, '1h', 200, context) // More data for better volume analysis
     ]);
     
     // Calculate technical indicators for both timeframes
     const indicators4h = calculateEnhancedTechnicalIndicators(candlesticks4h);
     const indicators1h = calculateEnhancedTechnicalIndicators(candlesticks1h);
+    
+    // Identify market regimes for both timeframes
+    const marketRegime4h = identifyMarketRegime(indicators4h);
+    const marketRegime1h = identifyMarketRegime(indicators1h);
     
     // Prepare recent OHLCV data
     const recentOHLCV4h = candlesticks4h.slice(-5).map(c => ({
@@ -474,6 +671,7 @@ export async function getEnhancedDerivativesMarketData(symbol: string): Promise<
       timeframes: {
         '4h': {
           timeframe: '4h',
+          marketRegime: marketRegime4h,
           price: {
             currentPrice: indicators4h.currentPrice,
             recentOHLCV: recentOHLCV4h
@@ -482,6 +680,7 @@ export async function getEnhancedDerivativesMarketData(symbol: string): Promise<
         },
         '1h': {
           timeframe: '1h',
+          marketRegime: marketRegime1h,
           price: {
             currentPrice: indicators1h.currentPrice,
             recentOHLCV: recentOHLCV1h
@@ -492,23 +691,47 @@ export async function getEnhancedDerivativesMarketData(symbol: string): Promise<
       market: marketInfo
     };
     
-    console.log(`✅ Successfully calculated enhanced multi-timeframe analysis for ${symbol}:`);
-    console.log(`📊 4h: Price $${indicators4h.currentPrice.toLocaleString()}, RSI ${indicators4h.rsi.toFixed(1)} (${indicators4h.rsiTrend})`);
-    console.log(`📊 1h: Price $${indicators1h.currentPrice.toLocaleString()}, RSI ${indicators1h.rsi.toFixed(1)} (${indicators1h.rsiTrend})`);
-    console.log(`📊 Volume: ${indicators1h.volumeTrend}`);
+    log('INFO', `Successfully calculated enhanced multi-timeframe analysis for ${symbol}:`);
+    log('INFO', `4h: Price $${indicators4h.currentPrice.toLocaleString()}, RSI ${indicators4h.rsi.toFixed(1)} (${indicators4h.rsiTrend})`);
+    log('INFO', `1h: Price $${indicators1h.currentPrice.toLocaleString()}, RSI ${indicators1h.rsi.toFixed(1)} (${indicators1h.rsiTrend})`);
+    log('INFO', `Market Regimes - 4h: ${marketRegime4h}, 1h: ${marketRegime1h}`);
+    log('INFO', `Volume: ${indicators1h.volumeTrend}`);
     
+    logFunctionExit('getEnhancedDerivativesMarketData', { 
+      symbol, 
+      price4h: indicators4h.currentPrice, 
+      price1h: indicators1h.currentPrice,
+      regime4h: marketRegime4h,
+      regime1h: marketRegime1h
+    });
+    endPerformanceTimer(timerId);
     return enhancedData;
     
   } catch (error) {
-    console.error(`❌ Error getting enhanced derivatives market data for ${symbol}:`, error.message);
+    log('ERROR', `Error getting enhanced derivatives market data for ${symbol}`, error.message);
+    logFunctionExit('getEnhancedDerivativesMarketData', null);
+    endPerformanceTimer(timerId);
     throw error;
   }
 }
 
 // Function to test Binance Futures API connectivity
 export async function testBinanceFuturesAPI(): Promise<boolean> {
+  const timerId = startPerformanceTimer('testBinanceFuturesAPI');
+  logFunctionEntry('testBinanceFuturesAPI');
+  
   try {
-    console.log('🧪 Testing Binance Futures API connectivity...');
+    log('INFO', 'Testing Binance Futures API connectivity...');
+    
+    const testUrl = `${BINANCE_FUTURES_API_BASE}/fapi/v1/ping`;
+    logApiRequest({
+      endpoint: testUrl,
+      method: 'GET',
+      headers: {
+        'User-Agent': 'CryptoTrader-Bot/1.0'
+      },
+      context: 'test connection'
+    });
     
     const response = await axios.get(`${BINANCE_FUTURES_API_BASE}/fapi/v1/ping`, {
       timeout: 5000,
@@ -517,14 +740,37 @@ export async function testBinanceFuturesAPI(): Promise<boolean> {
       }
     });
     
+    logApiResponse({
+      status: response.status,
+      statusText: response.statusText,
+      data: response.data,
+      context: 'test connection'
+    });
+    
     if (response.status === 200) {
-      console.log('✅ Binance Futures API test successful');
+      log('INFO', 'Binance Futures API test successful');
+      logFunctionExit('testBinanceFuturesAPI', true);
+      endPerformanceTimer(timerId);
       return true;
     }
     
+    logFunctionExit('testBinanceFuturesAPI', false);
+    endPerformanceTimer(timerId);
     return false;
   } catch (error) {
-    console.error('❌ Binance Futures API test failed:', error.message);
+    log('ERROR', 'Binance Futures API test failed', error.message);
+    
+    if (error.response) {
+      logApiResponse({
+        status: error.response.status,
+        statusText: error.response.statusText,
+        error: error.response.data,
+        context: 'test connection'
+      });
+    }
+    
+    logFunctionExit('testBinanceFuturesAPI', false);
+    endPerformanceTimer(timerId);
     return false;
   }
 }

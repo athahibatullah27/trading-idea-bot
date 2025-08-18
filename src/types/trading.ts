@@ -1,3 +1,21 @@
+// Core types for trade recommendation evaluation system
+
+export interface TradingRecommendation {
+  id?: string;
+  crypto: string;
+  action: 'buy' | 'sell' | 'hold';
+  confidence: number;
+  targetPrice: number;
+  stopLoss: number;
+  reasoning: string[];
+  timeframe: string;
+  riskLevel: 'low' | 'medium' | 'high';
+  status?: 'pending' | 'accurate' | 'inaccurate' | 'expired';
+  entryPrice?: number;
+  evaluationTimestamp?: string;
+  createdAt?: string;
+}
+
 export interface CryptoData {
   symbol: string;
   name: string;
@@ -22,17 +40,6 @@ export interface NewsItem {
   impact: 'high' | 'medium' | 'low';
 }
 
-export interface TradingRecommendation {
-  crypto: string;
-  action: 'buy' | 'sell' | 'hold';
-  confidence: number;
-  targetPrice: number;
-  stopLoss: number;
-  reasoning: string[];
-  timeframe: string;
-  riskLevel: 'low' | 'medium' | 'high';
-}
-
 export interface MarketConditions {
   overall: 'bullish' | 'bearish' | 'neutral';
   volatility: 'low' | 'medium' | 'high';
@@ -41,11 +48,4 @@ export interface MarketConditions {
     btc: number;
     eth: number;
   };
-}
-
-export interface GeopoliticalFactor {
-  event: string;
-  impact: 'positive' | 'negative' | 'neutral';
-  severity: number;
-  affectedRegions: string[];
 }

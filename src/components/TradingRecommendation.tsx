@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, TrendingDown, Minus, Target, Shield, Clock, AlertTriangle } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Target, Shield, Clock, AlertTriangle, CheckCircle, XCircle, Timer, Archive } from 'lucide-react';
 import { TradingRecommendation as TradingRecommendationType } from '../types/trading';
 
 interface TradingRecommendationProps {
@@ -46,8 +46,61 @@ export function TradingRecommendation({ recommendation }: TradingRecommendationP
     return 'text-red-400';
   };
 
+  const getStatusIcon = () => {
+    switch (recommendation.status) {
+      case 'accurate':
+        return <CheckCircle className="w-5 h-5 text-green-400" />;
+      case 'inaccurate':
+        return <XCircle className="w-5 h-5 text-red-400" />;
+      case 'expired':
+        return <Archive className="w-5 h-5 text-gray-400" />;
+      default:
+        return <Timer className="w-5 h-5 text-yellow-400" />;
+    }
+  };
+
+  const getStatusColor = () => {
+    switch (recommendation.status) {
+      case 'accurate':
+        return 'text-green-400 bg-green-400/10 border-green-400/20';
+      case 'inaccurate':
+        return 'text-red-400 bg-red-400/10 border-red-400/20';
+      case 'expired':
+        return 'text-gray-400 bg-gray-400/10 border-gray-400/20';
+      default:
+        return 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20';
+    }
+  };
+
+  const getStatusText = () => {
+    switch (recommendation.status) {
+      case 'accurate':
+        return 'Target Hit';
+      case 'inaccurate':
+        return 'Stop Loss Hit';
+      case 'expired':
+        return 'Expired';
+      default:
+        return 'Pending';
+    }
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
   return (
-    <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-blue-500/50 transition-all duration-200">
+    <div className={`bg-gray-800 rounded-lg p-6 border transition-all duration-200 ${
+      recommendation.status === 'accurate' ? 'border-green-500/50 hover:border-green-500' :
+      recommendation.status === 'inaccurate' ? 'border-red-500/50 hover:border-red-500' :
+      recommendation.status === 'expired' ? 'border-gray-500/50 hover:border-gray-500' :
+      'border-gray-700 hover:border-blue-500/50'
+    }`}>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-3">
           <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center text-white font-bold">
@@ -55,9 +108,15 @@ export function TradingRecommendation({ recommendation }: TradingRecommendationP
           </div>
           <div>
             <h3 className="text-white font-semibold text-lg">{recommendation.crypto}</h3>
-            <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full border text-sm font-medium ${getActionColor()}`}>
-              {getActionIcon()}
-              <span className="uppercase">{recommendation.action}</span>
+            <div className="flex items-center space-x-2">
+              <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full border text-sm font-medium ${getActionColor()}`}>
+                {getActionIcon()}
+                <span className="uppercase">{recommendation.action}</span>
+              </div>
+              <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full border text-xs font-medium ${getStatusColor()}`}>
+                {getStatusIcon()}
+                <span>{getStatusText()}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -91,6 +150,26 @@ export function TradingRecommendation({ recommendation }: TradingRecommendationP
           </p>
         </div>
       </div>
+
+      {recommendation.entryPrice && (
+        <div className="bg-gray-900/50 rounded-lg p-3 mb-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-gray-400 text-sm">Entry Price</span>
+              <p className="text-white font-semibold">${recommendation.entryPrice.toLocaleString()}</p>
+            </div>
+            <div className="text-right">
+              <span className="text-gray-400 text-sm">Created</span>
+              <p className="text-gray-300 text-sm">{formatDate(recommendation.createdAt)}</p>
+            </div>
+          </div>
+          {recommendation.evaluationTimestamp && (
+            <div className="mt-2 pt-2 border-t border-gray-700">
+              <span className="text-gray-400 text-xs">Evaluated: {formatDate(recommendation.evaluationTimestamp)}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex items-center justify-between mb-4 text-sm">
         <div className="flex items-center space-x-2">

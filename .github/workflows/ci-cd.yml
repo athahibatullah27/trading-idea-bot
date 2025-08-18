@@ -1,0 +1,49 @@
+# Name of your workflow (optional, but good practice)
+name: Docker CI/CD
+
+# Events that trigger this workflow
+on:
+  push:
+    branches:
+      - main # Trigger on pushes to the 'main' branch
+  pull_request:
+    branches:
+      - main # Trigger on pull requests targeting 'main'
+
+# Define one or more jobs
+jobs:
+  build-and-push: # Name of this job
+    runs-on: ubuntu-latest # The type of runner to use (e.g., Ubuntu Linux)
+
+    steps: # A sequence of tasks to be performed in this job
+      - name: Checkout code # Step 1: Get your code from the repository
+        uses: actions/checkout@v4 # Uses a pre-built action to checkout the repository
+
+      - name: Log in to Docker Hub # Step 2: Authenticate with Docker Hub (or your chosen registry)
+        uses: docker/login-action@v3 # Uses a pre-built action for Docker login
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }} # Accesses a GitHub Secret for username
+          password: ${{ secrets.DOCKER_PASSWORD }} # Accesses a GitHub Secret for password
+
+      - name: Build Docker image # Step 3: Build your Docker image
+        run: docker build . --file Dockerfile --tag your-docker-repo/your-image-name:${{ github.sha }} # Runs a shell command to build the image
+        # Replace 'your-docker-repo/your-image-name' with your actual Docker repository and image name.
+        # ${{ github.sha }} is a built-in variable that provides the commit SHA, useful for unique tags.
+
+      - name: Push Docker image # Step 4: Push the built image to the registry
+        run: docker push your-docker-repo/your-image-name:${{ github.sha }} # Runs a shell command to push the image
+
+      # You would add more steps here for testing, e.g.,
+      # - name: Run tests
+      #   run: docker run your-docker-repo/your-image-name:${{ github.sha }} npm test
+      # Or for deployment, e.g.,
+      # - name: Deploy to server
+      #   uses: appleboy/ssh-action@master
+      #   with:
+      #     host: ${{ secrets.SSH_HOST }}
+      #     username: ${{ secrets.SSH_USERNAME }}
+      #     key: ${{ secrets.SSH_PRIVATE_KEY }}
+      #     script: |
+      #       cd /path/to/your/app
+      #       docker compose pull your-service-name
+      #       docker compose up -d --no-deps your-service-name
