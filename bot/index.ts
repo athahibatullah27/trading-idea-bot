@@ -1019,7 +1019,6 @@ async function createMarketOverviewEmbed() {
     logFunctionEntry('createMarketOverviewEmbed');
     log('INFO', 'Fetching real-time market data for overview...');
     
-      logApiResponse({
     const majorCryptos = ['BTC', 'ETH', 'SOL', 'ADA', 'BNB'];
     const cryptoData = await getMultipleCryptoData(majorCryptos);
     
@@ -1212,18 +1211,16 @@ function createNewsEmbed(newsData?: NewsItem[]) {
   
   const newsToDisplay = newsData;
   const isRealTime = !!newsData;
-        data: result,
-        context: 'test connection'
+  
   const embed = new EmbedBuilder()
     .setColor(0x3b82f6)
     .setTitle(`📰 ${isRealTime ? 'Live' : 'Cached'} Crypto News & Sentiment`)
     .setDescription(`${isRealTime ? 'Real-time' : 'Recent'} market-moving news with sentiment analysis`)
     .setTimestamp()
     .setFooter({ text: `CryptoTrader Bot • ${isRealTime ? 'Live' : 'Cached'} News Analysis` });
-      logApiResponse({
+  
   newsToDisplay.forEach((news: NewsItem, index: number) => {
-        error: error.message,
-        context: 'test connection'
+    const sentimentEmoji = news.sentiment === 'bullish' ? '🟢' : 
                           news.sentiment === 'bearish' ? '🔴' : '🟡';
     const impactEmoji = news.impact === 'high' ? '🔥' : 
                        news.impact === 'medium' ? '⚡' : '💫';
