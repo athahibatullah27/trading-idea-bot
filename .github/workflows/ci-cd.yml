@@ -51,20 +51,24 @@ jobs:
           host: ${{ secrets.SSH_HOST }} # IP address or hostname of your server
           username: ${{ secrets.SSH_USERNAME }} # SSH username for your server
           key: ${{ secrets.SSH_PRIVATE_KEY }} # Your SSH private key (stored as a GitHub Secret)
-          script: | # Commands to execute on the remote server
+          script: |
             echo "Connecting to production server..."
-            # Navigate to your application's directory on the server
-            cd trading-idea-bot/ 
-
-            # Pull the latest Docker image from your registry
-            # Replace 'your-docker-repo/your-image-name' with your actual image name
-            # and 'your-service-name' with the service name from your docker-compose.yml
             echo "Pulling latest Docker image..."
-            docker compose pull backend # Assuming 'backend' is the service name in your docker-compose.yml
-
-            # Stop and remove the old container, then start a new one with the updated image
-            # The '--no-deps' flag ensures only the specified service is updated, not its dependencies
+            cd ~/trading-idea-bot && docker compose pull backend
             echo "Updating and restarting backend service..."
-            docker compose up -d --no-deps backend
+            cd ~/trading-idea-bot && docker compose up -d backend
+            
+            # Clean up old Docker images to save disk space
+            echo "Cleaning up old Docker images..."
+            docker image prune -f
+            
+            # Verify the service is running
+            echo "Verifying deployment..."
+            docker compose ps backend
+            
+            # Optional: Check if the API is responding
+            echo "Testing API connectivity..."
+            sleep 5  # Give the service a moment to start
+            curl -f http://localhost:3001/api/test-connection || echo "API test failed, but deployment completed"
 
             echo "Deployment complete!"

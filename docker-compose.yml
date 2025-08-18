@@ -2,8 +2,7 @@ version: '3.8'
 
 services:
   backend:
-    image: trade-bot-backend
-    build: .
+    image: iscav/trade-bot-backend:latest
     ports:
       - "3001:3001"
     environment:
