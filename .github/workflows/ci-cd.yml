@@ -29,12 +29,12 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }} # Accesses a GitHub Secret for password
 
       - name: Build Docker image # Step 3: Build your Docker image
-        run: docker build . --file Dockerfile --tag your-docker-repo/your-image-name:${{ github.sha }} # Runs a shell command to build the image
+        run: docker build . --file Dockerfile --tag iscav/trade-bot-backend:${{ github.sha }} # Runs a shell command to build the image
         # Replace 'your-docker-repo/your-image-name' with your actual Docker repository and image name.
         # ${{ github.sha }} is a built-in variable that provides the commit SHA, useful for unique tags.
 
       - name: Push Docker image # Step 4: Push the built image to the registry
-        run: docker push your-docker-repo/your-image-name:${{ github.sha }} # Runs a shell command to push the image
+        run: docker push iscav/trade-bot-backend:${{ github.sha }} # Runs a shell command to push the image
 
       # You would add more steps here for testing, e.g.,
       # - name: Run tests
