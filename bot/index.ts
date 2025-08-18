@@ -63,22 +63,22 @@ app.get('/api/crypto-data', async (req, res) => {
   try {
     const { symbol } = req.query;
     if (!symbol) {
-      logApiResponse('/api/crypto-data', { status: 400, data: { error: 'Symbol parameter is required' } });
+      logApiResponse({ status: 400, data: { error: 'Symbol parameter is required' }, context: 'crypto data' });
       endPerformanceTimer(timerId);
       return res.status(400).json({ error: 'Symbol parameter is required' });
     }
 
-    const data = await getRealTimeCryptoData(symbol as string);
+    const data = await getRealTimeCryptoData(symbol as string, 'crypto data');
     if (data) {
-      logApiResponse('/api/crypto-data', { status: 200, data });
+      logApiResponse({ status: 200, data, context: 'crypto data' });
       res.json(data);
     } else {
-      logApiResponse('/api/crypto-data', { status: 404, data: { error: `No data available for ${symbol}` } });
+      logApiResponse({ status: 404, data: { error: `No data available for ${symbol}` }, context: 'crypto data' });
       res.status(404).json({ error: `No data available for ${symbol}` });
     }
   } catch (error) {
     console.error('API proxy error:', error);
-    logApiResponse('/api/crypto-data', { status: 500, error, data: { error: 'Internal server error' } });
+    logApiResponse({ status: 500, error, data: { error: 'Internal server error' }, context: 'crypto data' });
     res.status(500).json({ error: 'Internal server error' });
   } finally {
     endPerformanceTimer(timerId);
@@ -98,18 +98,18 @@ app.get('/api/multiple-crypto-data', async (req, res) => {
   try {
     const { symbols } = req.query;
     if (!symbols) {
-      logApiResponse('/api/multiple-crypto-data', { status: 400, data: { error: 'Symbols parameter is required' } });
+      logApiResponse({ status: 400, data: { error: 'Symbols parameter is required' }, context: 'multiple crypto data' });
       endPerformanceTimer(timerId);
       return res.status(400).json({ error: 'Symbols parameter is required' });
     }
 
     const symbolArray = (symbols as string).split(',');
-    const data = await getMultipleCryptoData(symbolArray);
-    logApiResponse('/api/multiple-crypto-data', { status: 200, data });
+    const data = await getMultipleCryptoData(symbolArray, 'multiple crypto data');
+    logApiResponse({ status: 200, data, context: 'multiple crypto data' });
     res.json(data);
   } catch (error) {
     console.error('API proxy error:', error);
-    logApiResponse('/api/multiple-crypto-data', { status: 500, error, data: { error: 'Internal server error' } });
+    logApiResponse({ status: 500, error, data: { error: 'Internal server error' }, context: 'multiple crypto data' });
     res.status(500).json({ error: 'Internal server error' });
   } finally {
     endPerformanceTimer(timerId);
@@ -127,11 +127,11 @@ app.get('/api/test-connection', async (req, res) => {
   
   try {
     const isConnected = await testAPIConnection();
-    logApiResponse('/api/test-connection', { status: 200, data: { connected: isConnected } });
+    logApiResponse({ status: 200, data: { connected: isConnected }, context: 'test connection' });
     res.json({ connected: isConnected });
   } catch (error) {
     console.error('API test error:', error);
-    logApiResponse('/api/test-connection', { status: 500, error, data: { connected: false, error: 'Test failed' } });
+    logApiResponse({ status: 500, error, data: { connected: false, error: 'Test failed' }, context: 'test connection' });
     res.status(500).json({ connected: false, error: 'Test failed' });
   } finally {
     endPerformanceTimer(timerId);
@@ -152,15 +152,16 @@ app.get('/api/gemini-recommendations', async (req, res) => {
     
     // Fetch latest crypto data
     const symbols = ['BTC', 'ETH', 'SOL', 'ADA'];
-    const cryptoData = await getMultipleCryptoData(symbols);
+    const cryptoData = await getMultipleCryptoData(symbols, 'gemini recommendations');
     
     if (cryptoData.length === 0) {
-      logApiResponse('/api/gemini-recommendations', { 
+      logApiResponse({ 
         status: 503, 
         data: { 
           error: 'Unable to fetch market data for analysis. Please try again later.',
           userMessage: 'Market data is currently unavailable. Please check back in a few minutes.'
-        }
+        },
+        context: 'gemini recommendations'
       });
       endPerformanceTimer(timerId);
       return res.status(503).json({ 
@@ -171,7 +172,7 @@ app.get('/api/gemini-recommendations', async (req, res) => {
     
     // Fetch real-time news from CoinDesk
     log('INFO', 'Fetching real-time news from CryptoCompare...');
-    const realTimeNews = await fetchCoinDeskNews(5); 
+    const realTimeNews = await fetchCoinDeskNews(5, 'gemini recommendations'); 
     
     if (realTimeNews.length > 0) {
       log('INFO', `Using ${realTimeNews.length} real-time news articles from CryptoCompare`);
@@ -183,16 +184,18 @@ app.get('/api/gemini-recommendations', async (req, res) => {
     const recommendations = await generateGeminiRecommendations(
       cryptoData,
       realTimeNews.length > 0 ? realTimeNews : undefined, // Include real-time news only if available
-      undefined   // No market conditions (removed mock data)
+      undefined,   // No market conditions (removed mock data)
+      'gemini recommendations'
     );
     
     if (recommendations.length === 0) {
-      logApiResponse('/api/gemini-recommendations', { 
+      logApiResponse({ 
         status: 503, 
         data: { 
           error: 'AI analysis service is temporarily unavailable. Please try again later.',
           userMessage: 'Our AI trading analysis is currently unavailable. This could be due to high demand or maintenance. Please try again in a few minutes.'
-        }
+        },
+        context: 'gemini recommendations'
       });
       endPerformanceTimer(timerId);
       return res.status(503).json({ 
@@ -204,25 +207,26 @@ app.get('/api/gemini-recommendations', async (req, res) => {
     // Store recommendations in Supabase with current prices as entry prices
     log('INFO', 'Storing recommendations in Supabase...', { count: recommendations.length });
     for (const recommendation of recommendations) {
-      const cryptoData = await getRealTimeCryptoData(recommendation.crypto);
+      const cryptoData = await getRealTimeCryptoData(recommendation.crypto, 'gemini recommendations');
       const entryPrice = cryptoData?.price || recommendation.targetPrice;
       await storeTradeRecommendation(recommendation, entryPrice);
     }
     
     log('INFO', `Successfully generated ${recommendations.length} Gemini recommendations`);
     logFunctionExit('generateGeminiRecommendations', { count: recommendations.length });
-    logApiResponse('/api/gemini-recommendations', { status: 200, data: recommendations });
+    logApiResponse({ status: 200, data: recommendations, context: 'gemini recommendations' });
     res.json(recommendations);
     
   } catch (error) {
     console.error('Gemini recommendations error:', error);
-    logApiResponse('/api/gemini-recommendations', { 
+    logApiResponse({ 
       status: 500, 
       error,
       data: { 
         error: 'AI analysis service encountered an error. Please try again later.',
         userMessage: 'We encountered an issue while analyzing the market. Please try again in a few minutes.'
-      }
+      },
+      context: 'gemini recommendations'
     });
     res.status(500).json({ 
       error: 'AI analysis service encountered an error. Please try again later.',
@@ -246,12 +250,7 @@ app.get('/api/evaluated-recommendations', async (req, res) => {
     logFunctionEntry('fetchEvaluatedRecommendations');
     logDatabaseOperation({
       operation: 'SELECT',
-      table: 'trade_recommendations',
-      headers: {
-        'User-Agent': req.headers['user-agent'],
-        'Accept': req.headers['accept']
-      },
-      context: 'test connection'
+      table: 'trade_recommendations'
     });
     
     const { data: recommendations, error } = await supabase
@@ -262,7 +261,7 @@ app.get('/api/evaluated-recommendations', async (req, res) => {
 
     if (error) {
       logDatabaseError('SELECT', 'trade_recommendations', error);
-      logApiResponse('/api/evaluated-recommendations', { status: 500, error, data: { error: 'Failed to fetch recommendations' } });
+      logApiResponse({ status: 500, error, data: { error: 'Failed to fetch recommendations' }, context: 'evaluation' });
       endPerformanceTimer(timerId);
       return res.status(500).json({ error: 'Failed to fetch recommendations' });
     }
@@ -292,12 +291,12 @@ app.get('/api/evaluated-recommendations', async (req, res) => {
 
     log('INFO', `Successfully fetched ${transformedRecommendations.length} recommendations`);
     logFunctionExit('fetchEvaluatedRecommendations', { count: transformedRecommendations.length });
-    logApiResponse('/api/evaluated-recommendations', { status: 200, data: transformedRecommendations });
+    logApiResponse({ status: 200, data: transformedRecommendations, context: 'evaluation' });
     res.json(transformedRecommendations);
     
   } catch (error) {
     log('ERROR', 'Error fetching evaluated recommendations', error);
-    logApiResponse('/api/evaluated-recommendations', { status: 500, error, data: { error: 'Internal server error' } });
+    logApiResponse({ status: 500, error, data: { error: 'Internal server error' }, context: 'evaluation' });
     res.status(500).json({ error: 'Internal server error' });
   } finally {
     endPerformanceTimer(timerId);
@@ -317,11 +316,11 @@ app.get('/api/evaluation-stats', async (req, res) => {
     logFunctionEntry('getEvaluationStats');
     const stats = await getEvaluationStats();
     logFunctionExit('getEvaluationStats', stats);
-    logApiResponse('/api/evaluation-stats', { status: 200, data: stats });
+    logApiResponse({ status: 200, data: stats, context: 'evaluation' });
     res.json(stats);
   } catch (error) {
     log('ERROR', 'Error fetching evaluation stats', error);
-    logApiResponse('/api/evaluation-stats', { status: 500, error, data: { error: 'Failed to fetch statistics' } });
+    logApiResponse({ status: 500, error, data: { error: 'Failed to fetch statistics' }, context: 'evaluation' });
     res.status(500).json({ error: 'Failed to fetch statistics' });
   } finally {
     endPerformanceTimer(timerId);
