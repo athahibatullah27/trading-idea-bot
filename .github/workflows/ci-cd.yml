@@ -5,10 +5,10 @@ name: Docker CI/CD
 on:
   push:
     branches:
-      - main # Trigger on pushes to the 'main' branch
+      - master # Trigger on pushes to the 'main' branch
   pull_request:
     branches:
-      - main # Trigger on pull requests targeting 'main'
+      - master # Trigger on pull requests targeting 'main'
 
 # Define one or more jobs
 jobs:
