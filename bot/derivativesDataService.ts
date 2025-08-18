@@ -1,4 +1,13 @@
 import axios from 'axios';
+import { 
+  logApiRequest, 
+  logApiResponse, 
+  startPerformanceTimer, 
+  endPerformanceTimer,
+  logFunctionEntry,
+  logFunctionExit,
+  log
+} from './utils/logger.js';
 
 // Binance Futures API configuration
 const BINANCE_FUTURES_API_BASE = 'https://fapi.binance.com';
@@ -81,8 +90,11 @@ export async function fetchCandlestickData(
   interval: string = '1h', 
   limit: number = 100
 ): Promise<CandlestickData[]> {
+  const timerId = startPerformanceTimer('fetchCandlestickData');
+  logFunctionEntry('fetchCandlestickData', { symbol, interval, limit });
+  
   try {
-    console.log(`📊 Fetching ${limit} ${interval} candlesticks for ${symbol} from Binance Futures...`);
+    log('INFO', `Fetching ${limit} ${interval} candlesticks for ${symbol} from Binance Futures...`);
     
     const url = `${BINANCE_FUTURES_API_BASE}/fapi/v1/klines`;
     const params = {
@@ -90,6 +102,15 @@ export async function fetchCandlestickData(
       interval,
       limit
     };
+    
+    logApiRequest({
+      endpoint: url,
+      method: 'GET',
+      params,
+      headers: {
+        'User-Agent': 'CryptoTrader-Bot/1.0'
+      }
+    });
     
     const response = await axios.get(url, {
       params,
@@ -99,7 +120,16 @@ export async function fetchCandlestickData(
       }
     });
     
+    logApiResponse(url, {
+      status: response.status,
+      statusText: response.statusText,
+      data: response.data,
+      headers: response.headers
+    });
+    
     if (!response.data || !Array.isArray(response.data)) {
+      logFunctionExit('fetchCandlestickData', []);
+      endPerformanceTimer(timerId);
       throw new Error('Invalid response format from Binance API');
     }
     
@@ -117,11 +147,25 @@ export async function fetchCandlestickData(
       takerBuyQuoteAssetVolume: parseFloat(candle[10])
     }));
     
-    console.log(`✅ Successfully fetched ${candlesticks.length} candlesticks for ${symbol} (${interval})`);
+    log('INFO', `Successfully fetched ${candlesticks.length} candlesticks for ${symbol} (${interval})`);
+    logFunctionExit('fetchCandlestickData', { count: candlesticks.length });
+    endPerformanceTimer(timerId);
     return candlesticks;
     
   } catch (error) {
-    console.error(`❌ Error fetching candlestick data for ${symbol} (${interval}):`, error.message);
+    log('ERROR', `Error fetching candlestick data for ${symbol} (${interval})`, error.message);
+    
+    if (error.response) {
+      logApiResponse(error.config?.url || 'unknown', {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data,
+        error: error.response.data
+      });
+    }
+    
+    logFunctionExit('fetchCandlestickData', []);
+    endPerformanceTimer(timerId);
     throw error;
   }
 }
@@ -428,8 +472,11 @@ export function calculateEnhancedTechnicalIndicators(candlesticks: CandlestickDa
 
 // Function to get enhanced multi-timeframe derivatives market data
 export async function getEnhancedDerivativesMarketData(symbol: string): Promise<EnhancedDerivativesMarketData> {
+  const timerId = startPerformanceTimer('getEnhancedDerivativesMarketData');
+  logFunctionEntry('getEnhancedDerivativesMarketData', { symbol });
+  
   try {
-    console.log(`🔄 Fetching enhanced multi-timeframe market data for ${symbol}...`);
+    log('INFO', `Fetching enhanced multi-timeframe market data for ${symbol}...`);
     
     // Fetch candlestick data for both timeframes
     const [candlesticks4h, candlesticks1h] = await Promise.all([
@@ -492,23 +539,43 @@ export async function getEnhancedDerivativesMarketData(symbol: string): Promise<
       market: marketInfo
     };
     
-    console.log(`✅ Successfully calculated enhanced multi-timeframe analysis for ${symbol}:`);
-    console.log(`📊 4h: Price $${indicators4h.currentPrice.toLocaleString()}, RSI ${indicators4h.rsi.toFixed(1)} (${indicators4h.rsiTrend})`);
-    console.log(`📊 1h: Price $${indicators1h.currentPrice.toLocaleString()}, RSI ${indicators1h.rsi.toFixed(1)} (${indicators1h.rsiTrend})`);
-    console.log(`📊 Volume: ${indicators1h.volumeTrend}`);
+    log('INFO', `Successfully calculated enhanced multi-timeframe analysis for ${symbol}:`);
+    log('INFO', `4h: Price $${indicators4h.currentPrice.toLocaleString()}, RSI ${indicators4h.rsi.toFixed(1)} (${indicators4h.rsiTrend})`);
+    log('INFO', `1h: Price $${indicators1h.currentPrice.toLocaleString()}, RSI ${indicators1h.rsi.toFixed(1)} (${indicators1h.rsiTrend})`);
+    log('INFO', `Volume: ${indicators1h.volumeTrend}`);
     
+    logFunctionExit('getEnhancedDerivativesMarketData', { 
+      symbol, 
+      price4h: indicators4h.currentPrice, 
+      price1h: indicators1h.currentPrice 
+    });
+    endPerformanceTimer(timerId);
     return enhancedData;
     
   } catch (error) {
-    console.error(`❌ Error getting enhanced derivatives market data for ${symbol}:`, error.message);
+    log('ERROR', `Error getting enhanced derivatives market data for ${symbol}`, error.message);
+    logFunctionExit('getEnhancedDerivativesMarketData', null);
+    endPerformanceTimer(timerId);
     throw error;
   }
 }
 
 // Function to test Binance Futures API connectivity
 export async function testBinanceFuturesAPI(): Promise<boolean> {
+  const timerId = startPerformanceTimer('testBinanceFuturesAPI');
+  logFunctionEntry('testBinanceFuturesAPI');
+  
   try {
-    console.log('🧪 Testing Binance Futures API connectivity...');
+    log('INFO', 'Testing Binance Futures API connectivity...');
+    
+    const testUrl = `${BINANCE_FUTURES_API_BASE}/fapi/v1/ping`;
+    logApiRequest({
+      endpoint: testUrl,
+      method: 'GET',
+      headers: {
+        'User-Agent': 'CryptoTrader-Bot/1.0'
+      }
+    });
     
     const response = await axios.get(`${BINANCE_FUTURES_API_BASE}/fapi/v1/ping`, {
       timeout: 5000,
@@ -517,14 +584,37 @@ export async function testBinanceFuturesAPI(): Promise<boolean> {
       }
     });
     
+    logApiResponse(testUrl, {
+      status: response.status,
+      statusText: response.statusText,
+      data: response.data,
+      headers: response.headers
+    });
+    
     if (response.status === 200) {
-      console.log('✅ Binance Futures API test successful');
+      log('INFO', 'Binance Futures API test successful');
+      logFunctionExit('testBinanceFuturesAPI', true);
+      endPerformanceTimer(timerId);
       return true;
     }
     
+    logFunctionExit('testBinanceFuturesAPI', false);
+    endPerformanceTimer(timerId);
     return false;
   } catch (error) {
-    console.error('❌ Binance Futures API test failed:', error.message);
+    log('ERROR', 'Binance Futures API test failed', error.message);
+    
+    if (error.response) {
+      logApiResponse(error.config?.url || 'unknown', {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data,
+        error: error.response.data
+      });
+    }
+    
+    logFunctionExit('testBinanceFuturesAPI', false);
+    endPerformanceTimer(timerId);
     return false;
   }
 }

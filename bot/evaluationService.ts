@@ -1,6 +1,15 @@
 import { supabase } from './supabaseClient.js';
 import { getRealTimeCryptoData } from './tradingview.js';
 import { TradingRecommendation } from './types.js';
+import { 
+  logDatabaseOperation, 
+  logDatabaseError, 
+  logFunctionEntry, 
+  logFunctionExit, 
+  startPerformanceTimer, 
+  endPerformanceTimer,
+  log
+} from './utils/logger.js';
 
 export interface StoredTradeRecommendation extends TradingRecommendation {
   id: string;
@@ -15,41 +24,77 @@ export async function storeTradeRecommendation(
   recommendation: TradingRecommendation,
   entryPrice: number
 ): Promise<boolean> {
+  const timerId = startPerformanceTimer('storeTradeRecommendation');
+  logFunctionEntry('storeTradeRecommendation', { 
+    crypto: recommendation.crypto, 
+    action: recommendation.action,
+    entryPrice 
+  });
+  
   try {
-    console.log(`💾 Storing trade recommendation for ${recommendation.crypto}...`);
+    log('INFO', `Storing trade recommendation for ${recommendation.crypto}...`);
+    
+    const insertData = {
+      symbol: recommendation.crypto,
+      action: recommendation.action,
+      confidence: recommendation.confidence,
+      target_price: recommendation.targetPrice,
+      stop_loss: recommendation.stopLoss,
+      reasoning: recommendation.reasoning,
+      timeframe: recommendation.timeframe,
+      risk_level: recommendation.riskLevel,
+      entry_price: entryPrice,
+      status: 'pending'
+    };
+    
+    logDatabaseOperation({
+      operation: 'INSERT',
+      table: 'trade_recommendations',
+      params: insertData
+    });
     
     const { data, error } = await supabase
       .from('trade_recommendations')
-      .insert({
-        symbol: recommendation.crypto,
-        action: recommendation.action,
-        confidence: recommendation.confidence,
-        target_price: recommendation.targetPrice,
-        stop_loss: recommendation.stopLoss,
-        reasoning: recommendation.reasoning,
-        timeframe: recommendation.timeframe,
-        risk_level: recommendation.riskLevel,
-        entry_price: entryPrice,
-        status: 'pending'
-      });
+      .insert(insertData);
 
     if (error) {
-      console.error('❌ Error storing trade recommendation:', error.message);
+      logDatabaseError('INSERT', 'trade_recommendations', error);
+      logFunctionExit('storeTradeRecommendation', false);
+      endPerformanceTimer(timerId);
       return false;
     }
 
-    console.log(`✅ Successfully stored trade recommendation for ${recommendation.crypto}`);
+    logDatabaseOperation({
+      operation: 'INSERT',
+      table: 'trade_recommendations',
+      affectedRows: 1
+    });
+    
+    log('INFO', `Successfully stored trade recommendation for ${recommendation.crypto}`);
+    logFunctionExit('storeTradeRecommendation', true);
+    endPerformanceTimer(timerId);
     return true;
   } catch (error) {
-    console.error('❌ Error storing trade recommendation:', error);
+    log('ERROR', 'Error storing trade recommendation', error);
+    logFunctionExit('storeTradeRecommendation', false);
+    endPerformanceTimer(timerId);
     return false;
   }
 }
 
 // Function to evaluate pending trade recommendations
 export async function evaluatePendingRecommendations(): Promise<void> {
+  const timerId = startPerformanceTimer('evaluatePendingRecommendations');
+  logFunctionEntry('evaluatePendingRecommendations');
+  
   try {
-    console.log('🔍 Evaluating pending trade recommendations...');
+    log('INFO', 'Evaluating pending trade recommendations...');
+    
+    logDatabaseOperation({
+      operation: 'SELECT',
+      table: 'trade_recommendations',
+      query: "SELECT * FROM trade_recommendations WHERE status = 'pending'"
+    });
     
     // Fetch all pending recommendations
     const { data: pendingRecommendations, error } = await supabase
@@ -58,16 +103,26 @@ export async function evaluatePendingRecommendations(): Promise<void> {
       .eq('status', 'pending');
 
     if (error) {
-      console.error('❌ Error fetching pending recommendations:', error.message);
+      logDatabaseError('SELECT', 'trade_recommendations', error);
+      logFunctionExit('evaluatePendingRecommendations');
+      endPerformanceTimer(timerId);
       return;
     }
 
     if (!pendingRecommendations || pendingRecommendations.length === 0) {
-      console.log('📝 No pending recommendations to evaluate');
+      log('INFO', 'No pending recommendations to evaluate');
+      logFunctionExit('evaluatePendingRecommendations', { count: 0 });
+      endPerformanceTimer(timerId);
       return;
     }
 
-    console.log(`📊 Found ${pendingRecommendations.length} pending recommendations to evaluate`);
+    logDatabaseOperation({
+      operation: 'SELECT',
+      table: 'trade_recommendations',
+      resultCount: pendingRecommendations.length
+    });
+    
+    log('INFO', `Found ${pendingRecommendations.length} pending recommendations to evaluate`);
 
     // Evaluate each recommendation
     for (const recommendation of pendingRecommendations) {
@@ -77,21 +132,33 @@ export async function evaluatePendingRecommendations(): Promise<void> {
       await new Promise(resolve => setTimeout(resolve, 500));
     }
 
-    console.log('✅ Completed evaluation of all pending recommendations');
+    log('INFO', 'Completed evaluation of all pending recommendations');
+    logFunctionExit('evaluatePendingRecommendations', { count: pendingRecommendations.length });
+    endPerformanceTimer(timerId);
   } catch (error) {
-    console.error('❌ Error during recommendation evaluation:', error);
+    log('ERROR', 'Error during recommendation evaluation', error);
+    logFunctionExit('evaluatePendingRecommendations');
+    endPerformanceTimer(timerId);
   }
 }
 
 // Function to evaluate a single recommendation
 async function evaluateSingleRecommendation(recommendation: any): Promise<void> {
+  const timerId = startPerformanceTimer('evaluateSingleRecommendation');
+  logFunctionEntry('evaluateSingleRecommendation', { 
+    symbol: recommendation.symbol, 
+    action: recommendation.action 
+  });
+  
   try {
-    console.log(`🎯 Evaluating ${recommendation.symbol} ${recommendation.action} recommendation...`);
+    log('INFO', `Evaluating ${recommendation.symbol} ${recommendation.action} recommendation...`);
     
     // Get current price
     const currentData = await getRealTimeCryptoData(recommendation.symbol);
     if (!currentData || currentData.price <= 0) {
-      console.log(`⚠️ Could not fetch current price for ${recommendation.symbol}, skipping evaluation`);
+      log('WARN', `Could not fetch current price for ${recommendation.symbol}, skipping evaluation`);
+      logFunctionExit('evaluateSingleRecommendation');
+      endPerformanceTimer(timerId);
       return;
     }
 
@@ -100,7 +167,7 @@ async function evaluateSingleRecommendation(recommendation: any): Promise<void> 
     const stopLoss = parseFloat(recommendation.stop_loss);
     const entryPrice = parseFloat(recommendation.entry_price || recommendation.target_price);
 
-    console.log(`📊 ${recommendation.symbol}: Current $${currentPrice.toLocaleString()}, Target $${targetPrice.toLocaleString()}, Stop $${stopLoss.toLocaleString()}`);
+    log('INFO', `${recommendation.symbol}: Current $${currentPrice.toLocaleString()}, Target $${targetPrice.toLocaleString()}, Stop $${stopLoss.toLocaleString()}`);
 
     let newStatus: 'accurate' | 'inaccurate' | 'expired' | null = null;
     let evaluationReason = '';
@@ -154,25 +221,43 @@ async function evaluateSingleRecommendation(recommendation: any): Promise<void> 
 
     // Update recommendation status if evaluation criteria met
     if (newStatus) {
+      const updateData = {
+        status: newStatus,
+        evaluation_timestamp: new Date().toISOString()
+      };
+      
+      logDatabaseOperation({
+        operation: 'UPDATE',
+        table: 'trade_recommendations',
+        params: updateData,
+        query: `UPDATE trade_recommendations SET status = '${newStatus}', evaluation_timestamp = '${updateData.evaluation_timestamp}' WHERE id = '${recommendation.id}'`
+      });
+      
       const { error: updateError } = await supabase
         .from('trade_recommendations')
-        .update({
-          status: newStatus,
-          evaluation_timestamp: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', recommendation.id);
 
       if (updateError) {
-        console.error(`❌ Error updating recommendation ${recommendation.id}:`, updateError.message);
+        logDatabaseError('UPDATE', 'trade_recommendations', updateError);
       } else {
-        console.log(`✅ ${recommendation.symbol} recommendation marked as ${newStatus}: ${evaluationReason}`);
+        logDatabaseOperation({
+          operation: 'UPDATE',
+          table: 'trade_recommendations',
+          affectedRows: 1
+        });
+        log('INFO', `${recommendation.symbol} recommendation marked as ${newStatus}: ${evaluationReason}`);
       }
     } else {
-      console.log(`⏳ ${recommendation.symbol} recommendation still pending evaluation`);
+      log('INFO', `${recommendation.symbol} recommendation still pending evaluation`);
     }
 
+    logFunctionExit('evaluateSingleRecommendation', { status: newStatus || 'pending' });
+    endPerformanceTimer(timerId);
   } catch (error) {
-    console.error(`❌ Error evaluating recommendation for ${recommendation.symbol}:`, error);
+    log('ERROR', `Error evaluating recommendation for ${recommendation.symbol}`, error);
+    logFunctionExit('evaluateSingleRecommendation');
+    endPerformanceTimer(timerId);
   }
 }
 
@@ -185,15 +270,32 @@ export async function getEvaluationStats(): Promise<{
   expired: number;
   accuracyRate: number;
 }> {
+  const timerId = startPerformanceTimer('getEvaluationStats');
+  logFunctionEntry('getEvaluationStats');
+  
   try {
+    logDatabaseOperation({
+      operation: 'SELECT',
+      table: 'trade_recommendations',
+      query: 'SELECT status FROM trade_recommendations'
+    });
+    
     const { data, error } = await supabase
       .from('trade_recommendations')
       .select('status');
 
     if (error) {
-      console.error('❌ Error fetching evaluation stats:', error.message);
+      logDatabaseError('SELECT', 'trade_recommendations', error);
+      logFunctionExit('getEvaluationStats', { total: 0, pending: 0, accurate: 0, inaccurate: 0, expired: 0, accuracyRate: 0 });
+      endPerformanceTimer(timerId);
       return { total: 0, pending: 0, accurate: 0, inaccurate: 0, expired: 0, accuracyRate: 0 };
     }
+
+    logDatabaseOperation({
+      operation: 'SELECT',
+      table: 'trade_recommendations',
+      resultCount: data.length
+    });
 
     const stats = {
       total: data.length,
@@ -209,9 +311,14 @@ export async function getEvaluationStats(): Promise<{
       stats.accuracyRate = (stats.accurate / evaluated) * 100;
     }
 
+    log('INFO', 'Evaluation stats calculated', stats);
+    logFunctionExit('getEvaluationStats', stats);
+    endPerformanceTimer(timerId);
     return stats;
   } catch (error) {
-    console.error('❌ Error calculating evaluation stats:', error);
+    log('ERROR', 'Error calculating evaluation stats', error);
+    logFunctionExit('getEvaluationStats', { total: 0, pending: 0, accurate: 0, inaccurate: 0, expired: 0, accuracyRate: 0 });
+    endPerformanceTimer(timerId);
     return { total: 0, pending: 0, accurate: 0, inaccurate: 0, expired: 0, accuracyRate: 0 };
   }
 }

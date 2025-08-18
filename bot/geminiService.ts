@@ -2,6 +2,15 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { CryptoData, NewsItem, MarketConditions, TradingRecommendation } from './types.js';
 import { EnhancedDerivativesMarketData } from './derivativesDataService.js';
 import dotenv from 'dotenv';
+import { 
+  logApiRequest, 
+  logApiResponse, 
+  startPerformanceTimer, 
+  endPerformanceTimer,
+  logFunctionEntry,
+  logFunctionExit,
+  log
+} from './utils/logger.js';
 
 dotenv.config();
 
@@ -25,44 +34,89 @@ export async function generateGeminiRecommendations(
   news?: NewsItem[],
   marketConditions?: MarketConditions
 ): Promise<TradingRecommendation[]> {
+  const timerId = startPerformanceTimer('generateGeminiRecommendations');
+  logFunctionEntry('generateGeminiRecommendations', { 
+    cryptoCount: cryptoData.length, 
+    newsCount: news?.length || 0,
+    hasMarketConditions: !!marketConditions 
+  });
+  
   try {
-    console.log('🤖 Generating AI recommendations using Gemini...');
+    log('INFO', 'Generating AI recommendations using Gemini...');
     
     if (!process.env.GEMINI_API_KEY) {
-      console.error('❌ GEMINI_API_KEY is not configured');
+      log('ERROR', 'GEMINI_API_KEY is not configured');
+      logFunctionExit('generateGeminiRecommendations', []);
+      endPerformanceTimer(timerId);
       return [];
     }
 
     if (cryptoData.length === 0) {
-      console.error('❌ No crypto data provided for Gemini analysis');
+      log('ERROR', 'No crypto data provided for Gemini analysis');
+      logFunctionExit('generateGeminiRecommendations', []);
+      endPerformanceTimer(timerId);
       return [];
     }
 
     // Construct the prompt for Gemini
     const prompt = buildGeminiPrompt(cryptoData, news, marketConditions);
     
-    console.log('📝 Sending prompt to Gemini API...');
+    log('INFO', 'Sending prompt to Gemini API...');
+    
+    // Log API request (without sensitive data)
+    logApiRequest({
+      endpoint: 'Gemini AI API',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': '[REDACTED]'
+      },
+      body: {
+        model: 'gemini-2.0-flash-exp',
+        promptLength: prompt.length,
+        cryptoSymbols: cryptoData.map(c => c.symbol)
+      }
+    });
     
     // Generate content using Gemini
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
     
-    console.log('✅ Received response from Gemini API');
+    logApiResponse('Gemini AI API', {
+      status: 200,
+      data: {
+        responseLength: text.length,
+        responsePreview: text.substring(0, 200) + '...'
+      }
+    });
     
-      undefined   // No market conditions needed
+    log('INFO', 'Received response from Gemini API');
+    
     const recommendations = parseGeminiResponse(text, cryptoData);
     
     if (recommendations.length === 0) {
-      console.error('❌ Failed to parse valid recommendations from Gemini');
+      log('ERROR', 'Failed to parse valid recommendations from Gemini');
+      logFunctionExit('generateGeminiRecommendations', []);
+      endPerformanceTimer(timerId);
       return [];
     }
     
-    console.log(`🎯 Generated ${recommendations.length} AI recommendations`);
+    log('INFO', `Generated ${recommendations.length} AI recommendations`);
+    logFunctionExit('generateGeminiRecommendations', { count: recommendations.length });
+    endPerformanceTimer(timerId);
     return recommendations;
     
   } catch (error) {
-    console.error('❌ Error generating Gemini recommendations:', error.message);
+    log('ERROR', 'Error generating Gemini recommendations', error.message);
+    
+    logApiResponse('Gemini AI API', {
+      status: 500,
+      error: error.message
+    });
+    
+    logFunctionExit('generateGeminiRecommendations', []);
+    endPerformanceTimer(timerId);
     return [];
   }
 }
@@ -132,6 +186,11 @@ Ensure all prices are realistic numbers without commas, confidence is 0-100, act
 }
 
 function parseGeminiResponse(text: string, cryptoData: CryptoData[]): TradingRecommendation[] {
+  logFunctionEntry('parseGeminiResponse', { 
+    textLength: text.length, 
+    cryptoCount: cryptoData.length 
+  });
+  
   try {
     // Clean the response text to extract JSON
     let jsonText = text.trim();
@@ -157,7 +216,7 @@ function parseGeminiResponse(text: string, cryptoData: CryptoData[]): TradingRec
     // Extract only the JSON array part
     jsonText = jsonText.substring(startIndex, lastIndex + 1);
     
-    console.log('🔍 Cleaned JSON for parsing:', jsonText.substring(0, 200) + '...');
+    log('INFO', 'Cleaned JSON for parsing:', jsonText.substring(0, 200) + '...');
     
     // Parse the JSON
     const recommendations: TradingRecommendation[] = JSON.parse(jsonText);
@@ -181,13 +240,14 @@ function parseGeminiResponse(text: string, cryptoData: CryptoData[]): TradingRec
       }))
       .filter(rec => cryptoData.some(crypto => crypto.symbol === rec.crypto));
     
-    console.log(`✅ Parsed ${validRecommendations.length} valid recommendations from Gemini`);
+    log('INFO', `Parsed ${validRecommendations.length} valid recommendations from Gemini`);
+    logFunctionExit('parseGeminiResponse', { count: validRecommendations.length });
     return validRecommendations;
     
   } catch (error) {
-    console.error('❌ Error parsing Gemini response:', error.message);
-    console.log('📄 Raw response (first 500 chars):', text.substring(0, 500) + '...');
-    console.log('📄 Raw response (last 500 chars):', '...' + text.substring(Math.max(0, text.length - 500)));
+    log('ERROR', 'Error parsing Gemini response', error.message);
+    log('ERROR', 'Raw response (first 500 chars):', text.substring(0, 500) + '...');
+    log('ERROR', 'Raw response (last 500 chars):', '...' + text.substring(Math.max(0, text.length - 500)));
     
     // Try to extract partial JSON if possible
     try {
@@ -231,11 +291,11 @@ function parseGeminiResponse(text: string, cryptoData: CryptoData[]): TradingRec
         
         if (endIndex !== -1) {
           const partialJson = text.substring(startIndex, endIndex + 1);
-          console.log('🔄 Attempting to parse partial JSON...');
+          log('INFO', 'Attempting to parse partial JSON...');
           const partialRecommendations = JSON.parse(partialJson);
           
           if (Array.isArray(partialRecommendations) && partialRecommendations.length > 0) {
-            console.log('✅ Successfully parsed partial JSON with', partialRecommendations.length, 'recommendations');
+            log('INFO', `Successfully parsed partial JSON with ${partialRecommendations.length} recommendations`);
             
             // Apply the same validation as above
             const validRecommendations = partialRecommendations
@@ -253,15 +313,17 @@ function parseGeminiResponse(text: string, cryptoData: CryptoData[]): TradingRec
               .filter(rec => cryptoData.some(crypto => crypto.symbol === rec.crypto));
             
             if (validRecommendations.length > 0) {
+              logFunctionExit('parseGeminiResponse', { count: validRecommendations.length });
               return validRecommendations;
             }
           }
         }
       }
     } catch (partialError) {
-      console.log('❌ Partial JSON parsing also failed:', partialError.message);
+      log('ERROR', 'Partial JSON parsing also failed', partialError.message);
     }
     
+    logFunctionExit('parseGeminiResponse', []);
     return [];
   }
 }
@@ -269,39 +331,83 @@ function parseGeminiResponse(text: string, cryptoData: CryptoData[]): TradingRec
 export async function generateDerivativesTradeIdea(
   marketData: EnhancedDerivativesMarketData
 ): Promise<DerivativesTradeIdea | null> {
+  const timerId = startPerformanceTimer('generateDerivativesTradeIdea');
+  logFunctionEntry('generateDerivativesTradeIdea', { symbol: marketData.symbol });
+  
   try {
-    console.log(`🤖 Generating derivatives trade idea for ${marketData.symbol} using Gemini...`);
+    log('INFO', `Generating derivatives trade idea for ${marketData.symbol} using Gemini...`);
     
     if (!process.env.GEMINI_API_KEY) {
-      console.error('❌ GEMINI_API_KEY is not configured');
+      log('ERROR', 'GEMINI_API_KEY is not configured');
+      logFunctionExit('generateDerivativesTradeIdea', null);
+      endPerformanceTimer(timerId);
       return null;
     }
 
     // Construct the prompt for derivatives trade analysis
     const prompt = buildEnhancedDerivativesTradePrompt(marketData);
     
-    console.log('📝 Sending derivatives trade prompt to Gemini API...');
+    log('INFO', 'Sending derivatives trade prompt to Gemini API...');
+    
+    // Log API request (without sensitive data)
+    logApiRequest({
+      endpoint: 'Gemini AI API (Derivatives)',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': '[REDACTED]'
+      },
+      body: {
+        model: 'gemini-2.0-flash-exp',
+        promptLength: prompt.length,
+        symbol: marketData.symbol,
+        timeframes: Object.keys(marketData.timeframes)
+      }
+    });
     
     // Generate content using Gemini
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
     
-    console.log('✅ Received derivatives trade response from Gemini API');
+    logApiResponse('Gemini AI API (Derivatives)', {
+      status: 200,
+      data: {
+        responseLength: text.length,
+        responsePreview: text.substring(0, 200) + '...'
+      }
+    });
+    
+    log('INFO', 'Received derivatives trade response from Gemini API');
     
     // Parse the JSON response
     const tradeIdea = parseDerivativesTradeResponse(text, marketData);
     
     if (!tradeIdea) {
-      console.error('❌ Failed to parse valid trade idea from Gemini');
+      log('ERROR', 'Failed to parse valid trade idea from Gemini');
+      logFunctionExit('generateDerivativesTradeIdea', null);
+      endPerformanceTimer(timerId);
       return null;
     }
     
-    console.log(`🎯 Generated derivatives trade idea: ${tradeIdea.direction.toUpperCase()} ${tradeIdea.symbol}`);
+    log('INFO', `Generated derivatives trade idea: ${tradeIdea.direction.toUpperCase()} ${tradeIdea.symbol}`);
+    logFunctionExit('generateDerivativesTradeIdea', { 
+      direction: tradeIdea.direction, 
+      confidence: tradeIdea.confidence 
+    });
+    endPerformanceTimer(timerId);
     return tradeIdea;
     
   } catch (error) {
-    console.error('❌ Error generating derivatives trade idea:', error.message);
+    log('ERROR', 'Error generating derivatives trade idea', error.message);
+    
+    logApiResponse('Gemini AI API (Derivatives)', {
+      status: 500,
+      error: error.message
+    });
+    
+    logFunctionExit('generateDerivativesTradeIdea', null);
+    endPerformanceTimer(timerId);
     return null;
   }
 }
@@ -426,6 +532,11 @@ Respond ONLY with a valid JSON object in this exact format:
 }
 
 function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivativesMarketData): DerivativesTradeIdea | null {
+  logFunctionEntry('parseDerivativesTradeResponse', { 
+    textLength: text.length, 
+    symbol: marketData.symbol 
+  });
+  
   try {
     // Clean the response text to extract JSON
     let jsonText = text.trim();
@@ -451,14 +562,15 @@ function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivat
     // Extract only the JSON object part
     jsonText = jsonText.substring(startIndex, lastIndex + 1);
     
-    console.log('🔍 Cleaned JSON for parsing:', jsonText.substring(0, 200) + '...');
+    log('INFO', 'Cleaned JSON for parsing:', jsonText.substring(0, 200) + '...');
     
     // Parse the JSON
     const tradeData = JSON.parse(jsonText);
     
     // Handle the new "no_trade_due_to_c\onflict" direction
     if (tradeData.direction === 'no_trade_due_to_conflict') {
-      console.log('⚠️ AI determined no trade due to conflicting signals');
+      log('WARN', 'AI determined no trade due to conflicting signals');
+      logFunctionExit('parseDerivativesTradeResponse', { direction: 'no_trade' });
       return {
         direction: 'long', // Default to long for display purposes
         entry: 0,
@@ -493,12 +605,14 @@ function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivat
       timeframe: tradeData.timeframe || '6-24 hours'
     };
     
-    console.log(`✅ Parsed derivatives trade idea: ${tradeIdea.direction.toUpperCase()} ${tradeIdea.symbol} at $${tradeIdea.entry.toFixed(5)} (Confidence: ${tradeIdea.confidence}%)`);
+    log('INFO', `Parsed derivatives trade idea: ${tradeIdea.direction.toUpperCase()} ${tradeIdea.symbol} at $${tradeIdea.entry.toFixed(5)} (Confidence: ${tradeIdea.confidence}%)`);
+    logFunctionExit('parseDerivativesTradeResponse', tradeIdea);
     return tradeIdea;
     
   } catch (error) {
-    console.error('❌ Error parsing derivatives trade response:', error.message);
-    console.log('📄 Raw response (first 500 chars):', text.substring(0, 500) + '...');
+    log('ERROR', 'Error parsing derivatives trade response', error.message);
+    log('ERROR', 'Raw response (first 500 chars):', text.substring(0, 500) + '...');
+    logFunctionExit('parseDerivativesTradeResponse', null);
     return null;
   }
 }
