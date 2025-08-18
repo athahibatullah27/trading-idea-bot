@@ -395,7 +395,7 @@ client.once(Events.ClientReady, (readyClient) => {
     }
   });
   
-  // Start evaluation scheduler at specific UTC hours (00:00, 04:00, 08:00, 12:00, 16:00, 20:00)
+  // Start evaluation scheduler at specific UTC hours (03:00, 07:00, 11:00, 15:00, 19:00, 23:00)
   logAppState('STARTUP', { message: 'Starting trade recommendation evaluation scheduler at specific UTC hours...' });
   scheduleEvaluationAtSpecificHours();
   
@@ -418,7 +418,7 @@ function calculateNextEvaluationDelay(): number {
   
   // If no hour found today, use the first hour of tomorrow
   if (!nextHour) {
-    nextHour = evaluationHours[0]; // 00:00 UTC next day
+    nextHour = evaluationHours[0]; // 03:00 UTC next day
   }
   
   // Calculate target time
@@ -852,6 +852,40 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return;
       }
       
+      // Normalize the symbol input
+      const normalizedSymbol = symbol.toUpperCase().trim();
+      
+      // Basic validation for symbol format
+      if (!/^[A-Z0-9]{2,10}(USDT|USD|BUSD)?$/i.test(normalizedSymbol)) {
+        await interaction.editReply({
+          embeds: [{
+            color: 0xff6b6b,
+            title: '❌ Invalid Symbol Format',
+            description: `The symbol "${symbol}" doesn't appear to be a valid cryptocurrency symbol.`,
+            fields: [
+              {
+                name: '📝 Valid Examples',
+                value: '• BTCUSDT\n• ETHUSDT\n• SOLUSDT\n• ADAUSDT\n• BTC (will be converted to BTCUSDT)',
+                inline: false
+              },
+              {
+                name: '💡 Tips',
+                value: '• Use standard symbols like BTC, ETH, SOL\n• USDT pairs are preferred for derivatives\n• Avoid special characters or spaces',
+                inline: false
+              }
+            ],
+            timestamp: new Date().toISOString()
+          }]
+        });
+        return;
+      }
+
+      // Auto-append USDT if not present
+      let finalSymbol = normalizedSymbol;
+      if (!finalSymbol.endsWith('USDT') && !finalSymbol.endsWith('USD') && !finalSymbol.endsWith('BUSD')) {
+        finalSymbol = finalSymbol + 'USDT';
+      }
+
       // Show initial loading message
       logDiscordInteraction('EDIT_REPLY', { 
         commandName: interaction.commandName, 
@@ -861,22 +895,26 @@ client.on(Events.InteractionCreate, async (interaction) => {
       
       try {
         // Fetch comprehensive market data
-        const marketData = await getEnhancedDerivativesMarketData(symbol, 'derivative trade');
+        log('INFO', `Requesting derivatives trade idea for ${finalSymbol} (original: ${symbol})`);
         
         // Update loading message
         logDiscordInteraction('EDIT_REPLY', { 
           commandName: interaction.commandName, 
           message: `Generating enhanced AI trade idea for ${symbol}...` 
         });
-        await interaction.editReply(`🤖 **Generating enhanced AI trade idea for ${symbol}...**\n*Analyzing multi-timeframe technical indicators and recent price action*`);
+        log('INFO', `Processing derivatives trade request for ${finalSymbol} (user input: ${symbol})...`);
+        log('INFO', `Fetching market data for ${finalSymbol}...`);
+        const marketData = await getEnhancedDerivativesMarketData(finalSymbol, 'derivativetrade command');
         
         // Generate trade idea using Gemini
-        const tradeIdea = await generateDerivativesTradeIdea(marketData, 'derivative trade');
+        log('INFO', `Generating AI trade idea for ${finalSymbol}...`);
+        const tradeIdea = await generateDerivativesTradeIdea(marketData, 'derivativetrade command');
         
         if (!tradeIdea) {
           logDiscordInteraction('EDIT_REPLY', { 
             commandName: interaction.commandName, 
-            message: `Unable to generate trade idea for ${symbol}` 
+            message: `Unable to generate trade idea for ${finalSymbol}. Please try again later.`,
+            description: `Unable to generate trade idea for ${finalSymbol}. Please try again later.`
           });
           await interaction.editReply(`❌ **Unable to generate trade idea for ${symbol}**\n*AI analysis service may be temporarily unavailable. Please try again in a few minutes.*`);
           endPerformanceTimer(timerId);
@@ -959,6 +997,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           
           logDiscordInteraction('FOLLOW_UP', { 
             commandName: interaction.commandName, 
+            crypto: finalSymbol,
             message: `No trade recommendation for ${tradeIdea.symbol}` 
           });
           await interaction.followUp({ embeds: [noTradeEmbed] });
@@ -976,6 +1015,58 @@ client.on(Events.InteractionCreate, async (interaction) => {
           commandName: interaction.commandName, 
           error 
         });
+        
+        log('ERROR', `Error processing derivatives trade request for ${finalSymbol}`, error.message);
+        
+        // Check if it's a data fetching error (symbol not found)
+        const isDataError = error.message.includes('No data received') || 
+                           error.message.includes('Invalid response format') ||
+                           error.message.includes('Error fetching candlestick data');
+        
+        if (isDataError) {
+          await interaction.editReply({
+            embeds: [{
+              color: 0xff6b6b,
+              title: '❌ Symbol Not Found',
+              description: `Unable to find market data for "${finalSymbol}".`,
+              fields: [
+                {
+                  name: '🔍 Possible Issues',
+                  value: '• Symbol may not exist on Binance Futures\n• Symbol may be delisted or suspended\n• Temporary API connectivity issues',
+                  inline: false
+                },
+                {
+                  name: '💡 Suggestions',
+                  value: '• Check the symbol spelling\n• Try popular symbols like BTCUSDT, ETHUSDT\n• Wait a moment and try again',
+                  inline: false
+                },
+                {
+                  name: '📊 Your Input',
+                  value: `Original: "${symbol}"\nProcessed: "${finalSymbol}"`,
+                  inline: false
+                }
+              ],
+              timestamp: new Date().toISOString()
+            }]
+          });
+        } else {
+          // Generic error handling
+          await interaction.editReply({
+            embeds: [{
+              color: 0xff6b6b,
+              title: '❌ Analysis Error',
+              description: `An error occurred while analyzing ${finalSymbol}. Please try again later.`,
+              fields: [
+                {
+                  name: '🔧 Technical Details',
+                  value: error.message.length > 200 ? error.message.substring(0, 200) + '...' : error.message,
+                  inline: false
+                }
+              ],
+              timestamp: new Date().toISOString()
+            }]
+          });
+        }
         
         if (error.message.includes('Invalid symbol')) {
           logDiscordInteraction('EDIT_REPLY', { 
@@ -1409,7 +1500,7 @@ client.on(Events.MessageCreate, async (message) => {
           const newsEmbed = createNewsEmbed(realTimeNews);
           await message.channel.send({ embeds: [newsEmbed] });
         } else {
-          await loadingMsg.edit('⚠️ **No news articles available at the moment. Please try again later.**');
+          await loadingMsg.edit('⚠️ **News service temporarily unavailable. Please try again later.**');
         }
       } catch (error) {
         console.error('Error fetching real-time news for !news command:', error);

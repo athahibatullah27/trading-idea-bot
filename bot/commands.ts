@@ -63,13 +63,5 @@ export const commands = [
       option.setName('symbol')
         .setDescription('Derivatives symbol (e.g., BTCUSDT, ETHUSDT)')
         .setRequired(true)
-        .addChoices(
-          { name: 'Bitcoin Perpetual (BTCUSDT)', value: 'BTCUSDT' },
-          { name: 'Ethereum Perpetual (ETHUSDT)', value: 'ETHUSDT' },
-          { name: 'Solana Perpetual (SOLUSDT)', value: 'SOLUSDT' },
-          { name: 'Cardano Perpetual (ADAUSDT)', value: 'ADAUSDT' },
-          { name: 'Binance Coin Perpetual (BNBUSDT)', value: 'BNBUSDT' },
-          { name: 'Ripple Perpetual (XRPUSDT)', value: 'XRPUSDT' }
-        )
     )
 ];
