@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     image: iscav/trade-bot-backend:latest
