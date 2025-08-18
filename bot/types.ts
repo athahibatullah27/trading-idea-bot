@@ -1,6 +1,20 @@
 // Bot-specific types for the Discord bot
 // This file contains types that are only used by the bot
 
+export interface CandlestickData {
+  openTime: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  closeTime: number;
+  quoteAssetVolume: number;
+  numberOfTrades: number;
+  takerBuyBaseAssetVolume: number;
+  takerBuyQuoteAssetVolume: number;
+}
+
 export interface TradingRecommendation {
   id?: string;
   crypto: string;

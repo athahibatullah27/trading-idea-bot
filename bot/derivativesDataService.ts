@@ -1,5 +1,12 @@
 import axios from 'axios';
 import { 
+  TechnicalIndicators, 
+  TimeframeData, 
+  EnhancedDerivativesMarketData,
+  FibonacciLevels, 
+  CandlestickData
+} from './types.js';
+import { 
   logApiRequest, 
   logApiResponse, 
   startPerformanceTimer, 
@@ -12,77 +19,6 @@ import {
 // Binance Futures API configuration
 const BINANCE_FUTURES_API_BASE = 'https://fapi.binance.com';
 
-export interface CandlestickData {
-  openTime: number;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-  closeTime: number;
-  quoteAssetVolume: number;
-  numberOfTrades: number;
-  takerBuyBaseAssetVolume: number;
-  takerBuyQuoteAssetVolume: number;
-}
-
-export interface TechnicalIndicators {
-  rsi: number;
-  rsiTrend: 'rising' | 'falling' | 'flat';
-  macd: {
-    macd: number;
-    signal: number;
-    histogram: number;
-    trend: 'rising' | 'falling' | 'flat';
-  };
-  bollinger: {
-    upper: number;
-    middle: number;
-    lower: number;
-    trend: 'expanding' | 'contracting' | 'flat';
-  };
-  ema20: number;
-  ema50: number;
-  emaTrend: 'bullish' | 'bearish' | 'neutral';
-  support: number[];
-  resistance: number[];
-  currentPrice: number;
-  priceChange24h: number;
-  volume24h: number;
-  volumeTrend: 'significantly above average' | 'above average' | 'average' | 'below average';
-  averageVolume: number;
-}
-
-export interface TimeframeData {
-  timeframe: string;
-  price: {
-    currentPrice: number;
-    recentOHLCV: Array<{
-      open: number;
-      high: number;
-      low: number;
-      close: number;
-      volume: number;
-      timestamp: number;
-    }>;
-  };
-  indicators: TechnicalIndicators;
-}
-
-export interface EnhancedDerivativesMarketData {
-  symbol: string;
-  dataTimestamp: string;
-  timeframes: {
-    '4h': TimeframeData;
-    '1h': TimeframeData;
-  };
-  market: {
-    fundingRate: number;
-    volume24h: number;
-    volumeTrend: string;
-    averageVolume: number;
-  };
-}
 
 // Function to fetch candlestick data from Binance Futures
 export async function fetchCandlestickData(
@@ -644,8 +580,7 @@ export function calculateEnhancedTechnicalIndicators(candlesticks: CandlestickDa
   const ema50 = calculateEMA(closePrices, 50);
   const { support, resistance } = findMultipleSupportResistance(candlesticks);
   const { volumeTrend, averageVolume } = calculateVolumeTrend(candlesticks);
-  const fibonacci = calculateFibonacciLevels(candlesticks);
-  const fibonacci = calculateFibonacciLevels(candlesticks);
+  const fibonacciLevels = calculateFibonacciLevels(candlesticks);
   
   // Determine EMA trend
   let emaTrend: 'bullish' | 'bearish' | 'neutral' = 'neutral';
@@ -672,7 +607,7 @@ export function calculateEnhancedTechnicalIndicators(candlesticks: CandlestickDa
     emaTrend,
     support,
     resistance,
-    fibonacci: calculateFibonacciLevels(candlesticks),
+    fibonacci: fibonacciLevels,
     currentPrice,
     priceChange24h,
     volume24h,
