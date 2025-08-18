@@ -3,12 +3,15 @@ name: Docker CI/CD
 
 # Events that trigger this workflow
 on:
+  # push:
+  #   branches:
+  #     - master # Trigger on pushes to the 'main' branch
+  # pull_request:
+  #   branches:
+  #     - master # Trigger on pull requests targeting 'main'
   push:
     branches:
-      - master # Trigger on pushes to the 'main' branch
-  pull_request:
-    branches:
-      - master # Trigger on pull requests targeting 'main'
+      - supabase-integration # Trigger on pushes to the 'supabase-integration' branch
 
 # Define one or more jobs
 jobs:
