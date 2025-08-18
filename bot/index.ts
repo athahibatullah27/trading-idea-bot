@@ -913,8 +913,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         if (!tradeIdea) {
           logDiscordInteraction('EDIT_REPLY', { 
             commandName: interaction.commandName, 
-            message: `Unable to generate trade idea for ${finalSymbol}. Please try again later.`,
-            description: `Unable to generate trade idea for ${finalSymbol}. Please try again later.`
+            message: `Unable to generate trade idea for ${finalSymbol}. Please try again later.`
           });
           await interaction.editReply(`❌ **Unable to generate trade idea for ${symbol}**\n*AI analysis service may be temporarily unavailable. Please try again in a few minutes.*`);
           endPerformanceTimer(timerId);
@@ -997,7 +996,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
           
           logDiscordInteraction('FOLLOW_UP', { 
             commandName: interaction.commandName, 
-            crypto: finalSymbol,
             message: `No trade recommendation for ${tradeIdea.symbol}` 
           });
           await interaction.followUp({ embeds: [noTradeEmbed] });
@@ -1066,20 +1064,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
               timestamp: new Date().toISOString()
             }]
           });
-        }
-        
-        if (error.message.includes('Invalid symbol')) {
-          logDiscordInteraction('EDIT_REPLY', { 
-            commandName: interaction.commandName, 
-            message: `Invalid symbol: ${symbol}` 
-          });
-          await interaction.editReply(`❌ **Invalid symbol: ${symbol}**\n*Please make sure the symbol exists on Binance Futures (e.g., BTCUSDT, ETHUSDT)*`);
-        } else {
-          logDiscordInteraction('EDIT_REPLY', { 
-            commandName: interaction.commandName, 
-            message: `Error analyzing ${symbol}` 
-          });
-          await interaction.editReply(`❌ **Error analyzing ${symbol}**\n*Unable to fetch market data or generate trade idea. Please try again later.*`);
         }
         endPerformanceTimer(timerId);
       }
@@ -1359,6 +1343,7 @@ function createDerivativesTradeEmbed(tradeIdea: DerivativesTradeIdea, marketData
     embed.addFields(
       { name: '📊 Direction', value: tradeIdea.direction.toUpperCase(), inline: true },
       { name: '🎯 Entry Price', value: `$${tradeIdea.entry.toLocaleString()}`, inline: true },
+      { name: '🎯 Target Price', value: `$${tradeIdea.targetPrice.toLocaleString()}`, inline: true },
       { name: '🛡️ Stop Loss', value: `$${tradeIdea.stopLoss.toLocaleString()}`, inline: true },
       { name: '📈 Risk/Reward', value: `${tradeIdea.riskReward}:1`, inline: true },
       { name: '🎲 Confidence', value: `${tradeIdea.confidence}%`, inline: true },

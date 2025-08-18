@@ -21,6 +21,7 @@ const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 export interface DerivativesTradeIdea {
   direction: 'long' | 'short';
   entry: number;
+  targetPrice: number;
   stopLoss: number;
   riskReward: number;
   confidence: number;
@@ -625,6 +626,7 @@ function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivat
       return {
         direction: 'long', // Default to long for display purposes
         entry: 0,
+        targetPrice: 0,
         stopLoss: 0,
         riskReward: 0,
         confidence: 0,
@@ -646,12 +648,52 @@ function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivat
       confidence = Math.max(0, Math.min(95, Math.round(tradeData.confidence)));
     }
     
+    // Calculate target price if not provided or invalid
+    let targetPrice = 0;
+    const entry = Math.max(0, parseFloat((tradeData.entry || marketData.timeframes['1h'].indicators.currentPrice).toFixed(5)));
+    const stopLoss = Math.max(0, parseFloat((tradeData.stopLoss || marketData.timeframes['1h'].indicators.currentPrice * 0.95).toFixed(5)));
+    const riskReward = Math.max(0, Math.round((tradeData.riskReward || 0) * 10) / 10);
+    
+    if (tradeData.targetPrice && tradeData.targetPrice > 0) {
+      targetPrice = Math.max(0, parseFloat(tradeData.targetPrice.toFixed(5)));
+    } else if (entry > 0 && stopLoss > 0 && riskReward > 0) {
+      // Calculate target price based on risk/reward ratio
+      if (tradeData.direction === 'long') {
+        // For long: target = entry + (entry - stopLoss) * riskReward
+        const riskAmount = entry - stopLoss;
+        targetPrice = parseFloat((entry + (riskAmount * riskReward)).toFixed(5));
+      } else {
+        // For short: target = entry - (stopLoss - entry) * riskReward
+        const riskAmount = stopLoss - entry;
+        targetPrice = parseFloat((entry - (riskAmount * riskReward)).toFixed(5));
+      }
+    }
+    
+    // Validate and recalculate risk/reward ratio if needed
+    let finalRiskReward = riskReward;
+    if (entry > 0 && stopLoss > 0 && targetPrice > 0) {
+      if (tradeData.direction === 'long') {
+        const risk = entry - stopLoss;
+        const reward = targetPrice - entry;
+        if (risk > 0) {
+          finalRiskReward = Math.round((reward / risk) * 10) / 10;
+        }
+      } else {
+        const risk = stopLoss - entry;
+        const reward = entry - targetPrice;
+        if (risk > 0) {
+          finalRiskReward = Math.round((reward / risk) * 10) / 10;
+        }
+      }
+    }
+    
     // Validate and sanitize the trade idea
     const tradeIdea: DerivativesTradeIdea = {
       direction: ['long', 'short'].includes(tradeData.direction) ? tradeData.direction : 'long',
-      entry: Math.max(0, parseFloat((tradeData.entry || marketData.timeframes['1h'].indicators.currentPrice).toFixed(5))),
-      stopLoss: Math.max(0, parseFloat((tradeData.stopLoss || marketData.timeframes['1h'].indicators.currentPrice * 0.95).toFixed(5))),
-      riskReward: Math.max(0, Math.round((tradeData.riskReward || 0) * 10) / 10),
+      entry: entry,
+      stopLoss: stopLoss,
+      targetPrice: targetPrice,
+      riskReward: finalRiskReward,
       confidence: confidence,
       technicalReasoning: Array.isArray(tradeData.technicalReasoning) ? 
         tradeData.technicalReasoning.slice(0, 6) : 
@@ -660,7 +702,7 @@ function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivat
       timeframe: tradeData.timeframe || '6-24 hours'
     };
     
-    log('INFO', `Parsed derivatives trade idea: ${tradeIdea.direction.toUpperCase()} ${tradeIdea.symbol} at $${tradeIdea.entry.toFixed(5)} (Confidence: ${tradeIdea.confidence}%)`);
+    log('INFO', `Parsed derivatives trade idea: ${tradeIdea.direction.toUpperCase()} ${tradeIdea.symbol} at $${tradeIdea.entry.toFixed(5)}, Target: $${tradeIdea.targetPrice.toFixed(5)}, R/R: ${tradeIdea.riskReward}:1 (Confidence: ${tradeIdea.confidence}%)`);
     logFunctionExit('parseDerivativesTradeResponse', tradeIdea);
     return tradeIdea;
     
