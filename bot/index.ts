@@ -1236,80 +1236,56 @@ function createNewsEmbed(newsData?: NewsItem[]) {
 
 // Helper function to create derivatives trade idea embed
 function createDerivativesTradeEmbed(tradeIdea: DerivativesTradeIdea, marketData: any) {
-  // Handle no-trade scenarios
-  if (tradeIdea.confidence === 0 || tradeIdea.entry === 0) {
-    return new EmbedBuilder()
-      .setColor(0xffff00)
-      .setTitle(`⚠️ NO TRADE - ${tradeIdea.symbol}`)
-      .setDescription('No high-probability setup identified')
-      .addFields(
-        { 
-          name: '🤖 AI Analysis', 
-          value: tradeIdea.technicalReasoning.map(reason => `• ${reason}`).join('\n'), 
-          inline: false 
-        }
-      )
-      .setTimestamp()
-      .setFooter({ text: 'CryptoTrader Bot • Enhanced Analysis • Capital Preservation' });
-  }
-  
-  const directionEmoji = tradeIdea.direction === 'long' ? '🟢📈' : '🔴📉';
-  const directionColor = tradeIdea.direction === 'long' ? 0x00ff00 : 0xff0000;
-  
-  // Calculate target price based on risk-reward ratio
-  const riskAmount = Math.abs(tradeIdea.entry - tradeIdea.stopLoss);
-  const targetPrice = tradeIdea.direction === 'long' ? 
-    tradeIdea.entry + (riskAmount * tradeIdea.riskReward) :
-    tradeIdea.entry - (riskAmount * tradeIdea.riskReward);
-  
   const embed = new EmbedBuilder()
-    .setColor(directionColor)
-    .setTitle(`${directionEmoji} ${tradeIdea.direction.toUpperCase()} ${tradeIdea.symbol}`)
-    .setDescription(`**Enhanced Multi-Timeframe Analysis** • ${tradeIdea.confidence}% Confidence`)
-    .addFields(
-      { 
-        name: '🎯 Entry Price', 
-        value: `$${tradeIdea.entry.toFixed(5)}`, 
-        inline: true 
-      },
-      { 
-        name: '🛡️ Stop Loss', 
-        value: `$${tradeIdea.stopLoss.toFixed(5)}`, 
-        inline: true 
-      },
-      { 
-        name: '💰 Target Price', 
-        value: `$${targetPrice.toFixed(5)}`, 
-        inline: true 
-      },
-      { 
-        name: '⚖️ Risk/Reward Ratio', 
-        value: `1:${tradeIdea.riskReward}`, 
-        inline: true 
-      },
-      { 
-        name: '⏰ Timeframe', 
-        value: tradeIdea.timeframe, 
-        inline: true 
-      },
-      { 
-        name: '📊 Current Price', 
-        value: `$${marketData.timeframes['1h'].indicators.currentPrice.toFixed(5)}`, 
-        inline: true 
-      },
-      { 
-        name: '🔍 Enhanced Technical Analysis', 
-        value: tradeIdea.technicalReasoning.map(reason => `• ${reason}`).join('\n'), 
-        inline: false 
-      },
-      {
-        name: '📈 Multi-Timeframe Confluence',
-        value: `4h RSI: ${marketData.timeframes['4h'].indicators.rsi.toFixed(1)} (${marketData.timeframes['4h'].indicators.rsiTrend})\n1h RSI: ${marketData.timeframes['1h'].indicators.rsi.toFixed(1)} (${marketData.timeframes['1h'].indicators.rsiTrend})\nVolume: ${marketData.market.volumeTrend}`,
-        inline: false
-      }
-    )
-    .setTimestamp()
-    .setFooter({ text: 'CryptoTrader Bot • Enhanced Multi-Timeframe Analysis • Capital Preservation Priority • Not Financial Advice' });
+    .setColor(tradeIdea.direction === 'long' ? 0x00ff00 : 0xff0000)
+    .setTitle(`🎯 ${tradeIdea.symbol} Derivatives Trade Idea`)
+    .setTimestamp();
+
+  // Handle no trade recommendation case
+  if (tradeIdea.confidence === 0 || tradeIdea.entry === 0) {
+    embed.setColor(0xffaa00) // Orange color for no trade
+      .setTitle(`⚠️ ${tradeIdea.symbol} - No Trade Recommendation`)
+      .addFields(
+        { name: '📊 Analysis Result', value: 'No high-probability setup identified', inline: false },
+        { name: '🎲 Confidence', value: `${tradeIdea.confidence}%`, inline: true },
+        { name: '⏰ Timeframe', value: tradeIdea.timeframe, inline: true }
+      );
+    
+    // Add truncated reasoning for no trade
+    const reasoningText = tradeIdea.technicalReasoning
+      .map(reason => `• ${reason}`)
+      .join('\n');
+    
+    // Truncate to fit Discord's 1024 character limit
+    const truncatedReasoning = reasoningText.length > 1000 
+      ? reasoningText.substring(0, 1000) + '...' 
+      : reasoningText;
+    
+    embed.addFields({ name: '🔍 Analysis Summary', value: truncatedReasoning });
+    
+  } else {
+    // Add trade details for valid trades
+    embed.addFields(
+      { name: '📊 Direction', value: tradeIdea.direction.toUpperCase(), inline: true },
+      { name: '🎯 Entry Price', value: `$${tradeIdea.entry.toLocaleString()}`, inline: true },
+      { name: '🛡️ Stop Loss', value: `$${tradeIdea.stopLoss.toLocaleString()}`, inline: true },
+      { name: '📈 Risk/Reward', value: `${tradeIdea.riskReward}:1`, inline: true },
+      { name: '🎲 Confidence', value: `${tradeIdea.confidence}%`, inline: true },
+      { name: '⏰ Timeframe', value: tradeIdea.timeframe, inline: true }
+    );
+
+    // Add technical reasoning with length limit
+    const reasoningText = tradeIdea.technicalReasoning
+      .map(reason => `• ${reason}`)
+      .join('\n');
+    
+    // Truncate to fit Discord's 1024 character limit
+    const truncatedReasoning = reasoningText.length > 1000 
+      ? reasoningText.substring(0, 1000) + '...' 
+      : reasoningText;
+    
+    embed.addFields({ name: '🔍 Technical Analysis', value: truncatedReasoning });
+  }
 
   return embed;
 }

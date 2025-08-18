@@ -577,6 +577,7 @@ Respond ONLY with a valid JSON object in this exact format:
 - If 'direction' is 'no_trade_due_to_conflict', set 'entry', 'stopLoss', and 'riskReward' to 0.0, and 'confidence' to 'N/A' or below 75%, with 'technicalReasoning' explaining the lack of a clear setup or conflicting signals.
 - 'confidence' must be between 75-95 for high-quality setups. 'riskReward' is a decimal (e.g., 3.0).
 - 'technicalReasoning' must contain 5-6 items, explicitly focusing on multi-timeframe analysis, trend alignment, momentum, and volume confirmation, ordered by their impact on the decision.
+- Keep each 'technicalReasoning' item under 120 characters to fit Discord message limits.
  'technicalReasoning' must contain 5-6 items, explicitly focusing on market regime alignment, multi-timeframe analysis, Fibonacci confluences, trend alignment, momentum, and volume confirmation, ordered by their impact on the decision.
 **</output>**`;
 }
@@ -627,7 +628,11 @@ function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivat
         stopLoss: 0,
         riskReward: 0,
         confidence: 0,
-        technicalReasoning: tradeData.technicalReasoning || ['No high-probability setup identified due to conflicting signals'],
+        technicalReasoning: tradeData.technicalReasoning 
+          ? tradeData.technicalReasoning.map(reason => 
+              reason.length > 150 ? reason.substring(0, 150) + '...' : reason
+            ).slice(0, 4) // Limit to 4 reasons max
+          : ['No high-probability setup identified due to conflicting signals'],
         symbol: marketData.symbol,
         timeframe: 'No trade recommended'
       };
