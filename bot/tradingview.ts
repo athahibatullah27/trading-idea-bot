@@ -158,17 +158,30 @@ async function getAlternativeData(symbol: string, context?: string): Promise<Cry
       'SOL': 'solana',
       'ADA': 'cardano',
       'BNB': 'binancecoin',
-      'XRP': 'ripple'
+      'XRP': 'ripple',
+      'BIO': 'bio-protocol', // Add BIO token mapping
+      'BIOUSDT': 'bio-protocol' // Handle BIOUSDT directly
     };
 
-    const coinId = coinGeckoIds[symbol];
-    if (!coinId) {
+    // Try direct symbol lookup first
+    let actualCoinId = coinGeckoIds[symbol];
+    
+    // If not found and symbol ends with USDT, try base symbol
+    if (!actualCoinId && symbol.endsWith('USDT')) {
+      const baseSymbol = symbol.replace('USDT', '');
+      actualCoinId = coinGeckoIds[baseSymbol];
+    }
+    
+    // If still not found, throw error
+    if (!actualCoinId) {
+      const baseSymbol = symbol.endsWith('USDT') ? symbol.replace('USDT', '') : symbol;
       logFunctionExit('getAlternativeData', null);
       endPerformanceTimer(timerId);
-      throw new Error(`No CoinGecko ID found for ${symbol}`);
+      throw new Error(`No CoinGecko ID found for ${symbol} or ${baseSymbol}`);
     }
-
-    const endpoint = `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&include_24hr_change=true&include_market_cap=true&include_24hr_vol=true`;
+    
+    const endpoint = `https://api.coingecko.com/api/v3/simple/price?ids=${actualCoinId}&vs_currencies=usd&include_24hr_change=true&include_market_cap=true&include_24hr_vol=true`;
+    
     logApiRequest({
       endpoint,
       method: 'GET',
@@ -195,8 +208,8 @@ async function getAlternativeData(symbol: string, context?: string): Promise<Cry
       context
     });
 
-    const data = response.data[coinId];
-    if (!data) {
+    const responseData = response.data[actualCoinId];
+    if (!responseData) {
       logFunctionExit('getAlternativeData', null);
       endPerformanceTimer(timerId);
       throw new Error('No data from CoinGecko');
@@ -209,22 +222,22 @@ async function getAlternativeData(symbol: string, context?: string): Promise<Cry
     const cryptoData: CryptoData = {
       symbol: symbol,
       name: getCryptoName(symbol),
-      price: data.usd,
-      change24h: data.usd_24h_change || 0,
-      volume: data.usd_24h_vol || 0,
-      marketCap: data.usd_market_cap || 0,
+      price: responseData.usd,
+      change24h: responseData.usd_24h_change || 0,
+      volume: responseData.usd_24h_vol || 0,
+      marketCap: responseData.usd_market_cap || 0,
       rsi: mockRSI,
       macd: mockMACD,
       bollinger: {
-        upper: data.usd * 1.02,
-        middle: data.usd,
-        lower: data.usd * 0.98
+        upper: responseData.usd * 1.02,
+        middle: responseData.usd,
+        lower: responseData.usd * 0.98
       }
     };
 
     log('INFO', `Alternative API success for ${symbol}`, {
-      price: data.usd,
-      change24h: data.usd_24h_change?.toFixed(2) + '%'
+      price: responseData.usd,
+      change24h: responseData.usd_24h_change?.toFixed(2) + '%'
     });
 
     logFunctionExit('getAlternativeData', cryptoData);
