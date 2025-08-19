@@ -572,9 +572,9 @@ IMPORTANT NOTES:
 
 **<output>**
 Respond ONLY with a valid JSON object in this exact format:
-{ "direction": "long" | "short" | "no_trade_due_to_conflict", "entry": 119000.50000 | 0.0, "stopLoss": 117500.25000 | 0.0, "riskReward": 3.0 | 0.0, "confidence": 85 | "N/A", "technicalReasoning": [ "reason1", "reason2",... ], "timeframe": "6-24 hours" }
+{ "direction": "long" | "short" | "no_trade_due_to_conflict", "entry": 119000.5 | 0.031871 | 0.0, "stopLoss": 117500.25 | 0.031 | 0.0, "riskReward": 3.0 | 0.0, "confidence": 85 | "N/A", "technicalReasoning": [ "reason1", "reason2",... ], "timeframe": "6-24 hours" }
 
-- Ensure all prices are realistic numbers with high precision (up to 5 decimal places).
+- Ensure all prices are realistic numbers with appropriate precision based on the asset's price level (preserve natural precision from market data).
 - If 'direction' is 'no_trade_due_to_conflict', set 'entry', 'stopLoss', and 'riskReward' to 0.0, and 'confidence' to 'N/A' or below 75%, with 'technicalReasoning' explaining the lack of a clear setup or conflicting signals.
 - 'confidence' must be between 75-95 for high-quality setups. 'riskReward' is a decimal (e.g., 3.0).
 - 'technicalReasoning' must contain 5-6 items, explicitly focusing on multi-timeframe analysis, trend alignment, momentum, and volume confirmation, ordered by their impact on the decision.
@@ -650,22 +650,22 @@ function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivat
     
     // Calculate target price if not provided or invalid
     let targetPrice = 0;
-    const entry = Math.max(0, parseFloat((tradeData.entry || marketData.timeframes['1h'].indicators.currentPrice).toFixed(5)));
-    const stopLoss = Math.max(0, parseFloat((tradeData.stopLoss || marketData.timeframes['1h'].indicators.currentPrice * 0.95).toFixed(5)));
+    const entry = Math.max(0, parseFloat(tradeData.entry) || marketData.timeframes['1h'].indicators.currentPrice);
+    const stopLoss = Math.max(0, parseFloat(tradeData.stopLoss) || marketData.timeframes['1h'].indicators.currentPrice * 0.95);
     const riskReward = Math.max(0, Math.round((tradeData.riskReward || 0) * 10) / 10);
     
     if (tradeData.targetPrice && tradeData.targetPrice > 0) {
-      targetPrice = Math.max(0, parseFloat(tradeData.targetPrice.toFixed(5)));
+      targetPrice = Math.max(0, parseFloat(tradeData.targetPrice));
     } else if (entry > 0 && stopLoss > 0 && riskReward > 0) {
       // Calculate target price based on risk/reward ratio
       if (tradeData.direction === 'long') {
         // For long: target = entry + (entry - stopLoss) * riskReward
         const riskAmount = entry - stopLoss;
-        targetPrice = parseFloat((entry + (riskAmount * riskReward)).toFixed(5));
+        targetPrice = entry + (riskAmount * riskReward);
       } else {
         // For short: target = entry - (stopLoss - entry) * riskReward
         const riskAmount = stopLoss - entry;
-        targetPrice = parseFloat((entry - (riskAmount * riskReward)).toFixed(5));
+        targetPrice = entry - (riskAmount * riskReward);
       }
     }
     
@@ -673,16 +673,16 @@ function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivat
     let finalRiskReward = riskReward;
     if (entry > 0 && stopLoss > 0 && targetPrice > 0) {
       if (tradeData.direction === 'long') {
-        const risk = entry - stopLoss;
-        const reward = targetPrice - entry;
+        const risk = Math.abs(entry - stopLoss);
+        const reward = Math.abs(targetPrice - entry);
         if (risk > 0) {
-          finalRiskReward = Math.round((reward / risk) * 10) / 10;
+          finalRiskReward = Math.round((risk / reward) * 10) / 10;
         }
       } else {
-        const risk = stopLoss - entry;
-        const reward = entry - targetPrice;
+        const risk = Math.abs(stopLoss - entry);
+        const reward = Math.abs(entry - targetPrice);
         if (risk > 0) {
-          finalRiskReward = Math.round((reward / risk) * 10) / 10;
+          finalRiskReward = Math.round((risk / reward) * 10) / 10;
         }
       }
     }
