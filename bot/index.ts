@@ -934,7 +934,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
               crypto: tradeIdea.symbol,
               action: tradeIdea.direction === 'long' ? 'buy' : 'sell',
               confidence: tradeIdea.confidence,
-              targetPrice: targetPrice,
+              targetPrice: tradeIdea.targetPrice, // Use the actual target price from AI
               stopLoss: tradeIdea.stopLoss,
               reasoning: tradeIdea.technicalReasoning,
               timeframe: tradeIdea.timeframe,

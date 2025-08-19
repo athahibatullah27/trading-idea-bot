@@ -652,10 +652,11 @@ function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivat
     let targetPrice = 0;
     const entry = Math.max(0, parseFloat(tradeData.entry) || marketData.timeframes['1h'].indicators.currentPrice);
     const stopLoss = Math.max(0, parseFloat(tradeData.stopLoss) || marketData.timeframes['1h'].indicators.currentPrice * 0.95);
-    const riskReward = Math.max(0, Math.round((tradeData.riskReward || 0) * 10) / 10);
+    let riskReward = Math.max(0, Math.round((tradeData.riskReward || 0) * 10) / 10);
     
-    if (tradeData.targetPrice && tradeData.targetPrice > 0) {
-      targetPrice = Math.max(0, parseFloat(tradeData.targetPrice));
+    // Always use the targetPrice from Gemini if provided, otherwise calculate it
+    if (tradeData.targetPrice && parseFloat(tradeData.targetPrice) > 0) {
+      targetPrice = parseFloat(tradeData.targetPrice);
     } else if (entry > 0 && stopLoss > 0 && riskReward > 0) {
       // Calculate target price based on risk/reward ratio
       if (tradeData.direction === 'long') {
@@ -667,22 +668,28 @@ function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivat
         const riskAmount = stopLoss - entry;
         targetPrice = entry - (riskAmount * riskReward);
       }
+    } else {
+      // Fallback: use a reasonable target based on direction
+      if (tradeData.direction === 'long') {
+        targetPrice = entry * 1.05; // 5% above entry
+      } else {
+        targetPrice = entry * 0.95; // 5% below entry
+      }
     }
     
-    // Validate and recalculate risk/reward ratio if needed
-    let finalRiskReward = riskReward;
+    // Always recalculate risk/reward ratio based on actual prices to ensure accuracy
     if (entry > 0 && stopLoss > 0 && targetPrice > 0) {
       if (tradeData.direction === 'long') {
-        const risk = Math.abs(entry - stopLoss);
-        const reward = Math.abs(targetPrice - entry);
-        if (risk > 0) {
-          finalRiskReward = Math.round((risk / reward) * 10) / 10;
+        const riskAmount = Math.abs(entry - stopLoss);
+        const rewardAmount = Math.abs(targetPrice - entry);
+        if (riskAmount > 0 && rewardAmount > 0) {
+          riskReward = Math.round((riskAmount / rewardAmount) * 10) / 10;
         }
       } else {
-        const risk = Math.abs(stopLoss - entry);
-        const reward = Math.abs(entry - targetPrice);
-        if (risk > 0) {
-          finalRiskReward = Math.round((risk / reward) * 10) / 10;
+        const riskAmount = Math.abs(stopLoss - entry);
+        const rewardAmount = Math.abs(entry - targetPrice);
+        if (riskAmount > 0 && rewardAmount > 0) {
+          riskReward = Math.round((riskAmount / rewardAmount) * 10) / 10;
         }
       }
     }
@@ -693,7 +700,7 @@ function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivat
       entry: entry,
       stopLoss: stopLoss,
       targetPrice: targetPrice,
-      riskReward: finalRiskReward,
+      riskReward: riskReward,
       confidence: confidence,
       technicalReasoning: Array.isArray(tradeData.technicalReasoning) ? 
         tradeData.technicalReasoning.slice(0, 6) : 
