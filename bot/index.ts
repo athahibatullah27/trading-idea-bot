@@ -1069,6 +1069,62 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
       return;
     }
+
+    if (interaction.commandName === 'promptcheck') {
+      try {
+        logDiscordInteraction('COMMAND_RECEIVED', {
+          commandName: 'promptcheck',
+          userId: interaction.user.id,
+          username: interaction.user.username,
+          guildId: interaction.guildId || 'DM',
+          channelId: interaction.channelId,
+          description: 'Logging FinCoT-TA prompt and Gemini response for debugging'
+        });
+
+        logDiscordInteraction('DEFER_REPLY', {
+          commandName: 'promptcheck',
+          message: 'Processing prompt logging request...'
+        });
+
+        await interaction.deferReply();
+
+        log('INFO', '🔍 PROMPT CHECK: Starting prompt logging for debugging...');
+        log('INFO', '🔍 PROMPT CHECK: Using BTCUSDT as sample symbol for analysis');
+
+        // Fetch sample market data for BTCUSDT
+        const sampleMarketData = await getEnhancedDerivativesMarketData('BTCUSDT', 'promptcheck-debug');
+        
+        log('INFO', '🔍 PROMPT CHECK: Market data fetched, generating trade idea to capture prompt and response...');
+
+        // Generate trade idea (this will log the complete prompt and Gemini's response)
+        const tradeIdea = await generateDerivativesTradeIdea(sampleMarketData, 'promptcheck-debug');
+
+        log('INFO', '🔍 PROMPT CHECK: Prompt and response logging completed');
+        log('INFO', '🔍 PROMPT CHECK: Check the console output above for the complete FinCoT-TA prompt and Gemini response');
+
+        logDiscordInteraction('EDIT_REPLY', {
+          commandName: 'promptcheck',
+          message: 'Prompt logging completed. Check bot console for detailed output.'
+        });
+
+        await interaction.editReply({
+          content: '✅ **Prompt logging completed**\n\nCheck the bot console for the complete FinCoT-TA prompt and Gemini response details.',
+        });
+
+      } catch (error) {
+        log('ERROR', '🔍 PROMPT CHECK: Error during prompt logging', error.message);
+        
+        logDiscordInteraction('ERROR', {
+          commandName: 'promptcheck',
+          error: error.message
+        });
+
+        await interaction.editReply({
+          content: '❌ **Error during prompt logging**\n\nCheck the bot console for error details.',
+        });
+      }
+      return;
+    }
     
   } catch (error) {
     logDiscordInteraction('ERROR', { 

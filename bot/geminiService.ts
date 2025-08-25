@@ -504,10 +504,6 @@ DATA:
         `{"O": ${c.open.toFixed(5)}, "H": ${c.high.toFixed(5)}, "L": ${c.low.toFixed(5)}, "C": ${c.close.toFixed(5)}, "V": ${c.volume.toFixed(0)}}`
       ).join(', ')}]
     },
-    "MARKET CONDITIONS": {
-      "24h Volume": ${market.volume24h.toFixed(0)},
-      "Volume Trend": "${market.volumeTrend}",
-      "Average Volume": ${market.averageVolume.toFixed(0)},
       "Funding Rate": ${market.fundingRate.toFixed(3)}
     }
 }
@@ -551,34 +547,18 @@ INSTRUCTIONS FOR ANALYSIS:
  - Use Fibonacci levels as precise entry and exit points. For example, enter long positions at 61.8% retracement in uptrends, or target extension levels for profit-taking.
  - Precisely place the stop-loss using multiple support/resistance levels to ensure robust risk management and minimize potential losses.
  - Calculate the Risk-Reward Ratio. If the calculated ratio is less than 2:1, the trade idea is considered invalid for a high-confidence setup. In such cases, state 'No Trade Idea'.
- - *Self-assessment:* Is the proposed trade idea robust from a risk management perspective? Does it meet the minimum 2:1 risk-reward ratio? Is capital preservation prioritized?
-
-**Step 6: Final Confidence Calibration and Trade Idea Decision:**
- - **If** 4h and 1h timeframes align, AND there is strong confluence of 3+ weighted signals, AND the risk-reward is >= 2:1, **THEN** provide a high-confidence trade idea (75-95%). The confidence score should directly reflect the strength of confluence and alignment.
  - **ELSE IF** timeframes conflict, OR indicators are mixed/ambiguous, OR risk-reward is < 2:1, **THEN** state 'No Trade Idea' and provide detailed explanation for abstention due to lack of a high-probability setup or unfavorable risk. In such cases, the 'confidence' field should be explicitly stated as 'N/A' or below 75%.
  - Formulate 5-6 specific technical reasons in the 'technicalReasoning' array. Prioritize the most impactful and aligned signals, justifying the chosen trade direction and the assigned confidence level.
-**</thinking>**
-
-IMPORTANT NOTES:
-- Use TREND analysis (rising/falling RSI, MACD trend, Bollinger expansion/contraction) with full contextual awareness.
- Use MARKET REGIME analysis as the primary context, then apply TREND analysis (rising/falling RSI, MACD trend, Bollinger expansion/contraction) with full contextual awareness.
- Prioritize FIBONACCI CONFLUENCES - when multiple Fibonacci levels align with support/resistance or when price is reacting at key Fibonacci zones.
 - Consider VOLUME CONFIRMATION (significantly above average volume on trending moves = higher confidence) as a critical validation.
 - Focus on RECENT PRICE ACTION from candlestick data, especially reactions at support/resistance.
  Focus on RECENT PRICE ACTION from candlestick data, especially reactions at support/resistance and Fibonacci levels.
 - Ensure risk-reward ratio is at least 2:1 for all high-confidence trades.
-- Maintain HIGH PRECISION for all prices (up to 5 decimal places for accuracy).
- Use Fibonacci levels for precise entry/exit targeting and risk management.
-
-**<output>**
-Respond ONLY with a valid JSON object in this exact format:
 { "direction": "long" | "short" | "no_trade_due_to_conflict", "entry": 119000.5 | 0.031871 | 0.0, "stopLoss": 117500.25 | 0.031 | 0.0, "riskReward": 3.0 | 0.0, "confidence": 85 | "N/A", "technicalReasoning": [ "reason1", "reason2",... ], "timeframe": "6-24 hours" }
 
 - Ensure all prices are realistic numbers with appropriate precision based on the asset's price level (preserve natural precision from market data).
 - If 'direction' is 'no_trade_due_to_conflict', set 'entry', 'stopLoss', and 'riskReward' to 0.0, and 'confidence' to 'N/A' or below 75%, with 'technicalReasoning' explaining the lack of a clear setup or conflicting signals.
 - 'confidence' must be between 75-95 for high-quality setups. 'riskReward' is a decimal (e.g., 3.0).
 - 'technicalReasoning' must contain 5-6 items, explicitly focusing on multi-timeframe analysis, trend alignment, momentum, and volume confirmation, ordered by their impact on the decision.
-- Keep each 'technicalReasoning' item under 120 characters to fit Discord message limits.
  'technicalReasoning' must contain 5-6 items, explicitly focusing on market regime alignment, multi-timeframe analysis, Fibonacci confluences, trend alignment, momentum, and volume confirmation, ordered by their impact on the decision.
 **</output>**`;
 }
