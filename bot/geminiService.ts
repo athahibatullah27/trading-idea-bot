@@ -657,6 +657,10 @@ function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivat
     // Always use the targetPrice from Gemini if provided, otherwise calculate it
     if (tradeData.targetPrice && parseFloat(tradeData.targetPrice) > 0) {
       targetPrice = parseFloat(tradeData.targetPrice);
+      // Use Gemini's risk/reward ratio directly if we have the target price from Gemini
+      if (tradeData.riskReward && parseFloat(tradeData.riskReward) > 0) {
+        riskReward = parseFloat(tradeData.riskReward);
+      }
     } else if (entry > 0 && stopLoss > 0 && riskReward > 0) {
       // Calculate target price based on risk/reward ratio
       if (tradeData.direction === 'long') {
@@ -677,20 +681,13 @@ function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivat
       }
     }
     
-    // Always recalculate risk/reward ratio based on actual prices to ensure accuracy
-    if (entry > 0 && stopLoss > 0 && targetPrice > 0) {
-      if (tradeData.direction === 'long') {
-        const riskAmount = Math.abs(entry - stopLoss);
-        const rewardAmount = Math.abs(targetPrice - entry);
-        if (riskAmount > 0 && rewardAmount > 0) {
-          riskReward = Math.round((riskAmount / rewardAmount) * 10) / 10;
-        }
-      } else {
-        const riskAmount = Math.abs(stopLoss - entry);
-        const rewardAmount = Math.abs(entry - targetPrice);
-        if (riskAmount > 0 && rewardAmount > 0) {
-          riskReward = Math.round((riskAmount / rewardAmount) * 10) / 10;
-        }
+    // Only recalculate risk/reward if we don't have it from Gemini or if we calculated the target price
+    if ((!tradeData.riskReward || parseFloat(tradeData.riskReward) <= 0) && entry > 0 && stopLoss > 0 && targetPrice > 0) {
+      // Recalculate only if Gemini didn't provide a valid risk/reward ratio
+      const riskAmount = Math.abs(entry - stopLoss);
+      const rewardAmount = Math.abs(targetPrice - entry);
+      if (riskAmount > 0 && rewardAmount > 0) {
+        riskReward = Math.round((rewardAmount / riskAmount) * 10) / 10;
       }
     }
     
