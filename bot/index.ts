@@ -506,9 +506,30 @@ async function registerSlashCommands() {
   }
 }
 
+// Add a Set to track processed interactions to prevent duplicates
+const processedInteractions = new Set<string>();
+
 // Handle slash command interactions
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
+  
+  // Create a unique key for this interaction to prevent duplicate processing
+  const interactionKey = `${interaction.id}-${interaction.commandName}`;
+  
+  // Check if we've already processed this interaction
+  if (processedInteractions.has(interactionKey)) {
+    log('WARN', `Duplicate interaction detected for ${interaction.commandName}, skipping...`);
+    return;
+  }
+  
+  // Mark this interaction as processed
+  processedInteractions.add(interactionKey);
+  
+  // Clean up old processed interactions (keep only last 100)
+  if (processedInteractions.size > 100) {
+    const oldestKey = processedInteractions.values().next().value;
+    processedInteractions.delete(oldestKey);
+  }
 
   // Log the command received
   logDiscordInteraction('COMMAND_RECEIVED', {
@@ -1072,25 +1093,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     if (interaction.commandName === 'promptcheck') {
       try {
-        logDiscordInteraction('COMMAND_RECEIVED', {
-          commandName: 'promptcheck',
-          userId: interaction.user.id,
-          username: interaction.user.username,
-          guildId: interaction.guildId || 'DM',
-          channelId: interaction.channelId,
-          description: 'Logging FinCoT-TA prompt and Gemini response for debugging'
-        });
-
-        logDiscordInteraction('DEFER_REPLY', {
-          commandName: 'promptcheck',
-          message: 'Processing prompt logging request...'
-        });
-
-        await interaction.deferReply();
-
-        log('INFO', '🔍 PROMPT CHECK: Starting prompt logging for debugging...');
-        log('INFO', '🔍 PROMPT CHECK: Using BTCUSDT as sample symbol for analysis');
-
+        // Only defer if not already deferred
+        if (!interaction.deferred && !interaction.replied) {
+          logDiscordInteraction('DEFER_REPLY', {
+            commandName: interaction.commandName,
+            message: 'Processing prompt logging request...'
+          });
+          
+          await interaction.deferReply();
+        }
+        
+        log('INFO', '🔍 PROMPT CHECK: Starting prompt logging process...');
+        
         // Fetch sample market data for BTCUSDT
         const sampleMarketData = await getEnhancedDerivativesMarketData('BTCUSDT', 'promptcheck-debug');
         
@@ -1099,23 +1113,32 @@ client.on(Events.InteractionCreate, async (interaction) => {
         // Generate trade idea (this will log the complete prompt and Gemini's response)
         const tradeIdea = await generateDerivativesTradeIdea(sampleMarketData, 'promptcheck-debug');
 
-        log('INFO', '🔍 PROMPT CHECK: Prompt and response logging completed');
-        log('INFO', '🔍 PROMPT CHECK: Check the console output above for the complete FinCoT-TA prompt and Gemini response');
-
+        log('INFO', '🔍 PROMPT CHECK: Prompt logging completed successfully');
+        
+        // Send confirmation to Discord
+        if (interaction.deferred || interaction.replied) {
+          await interaction.editReply({
+            content: '✅ **Prompt logging completed**\n\nCheck the bot console for:\n• Complete FinCoT-TA prompt\n• Gemini raw response\n• Parsed trade analysis'
+          });
+        } else {
+          await interaction.reply({
+            content: '✅ **Prompt logging completed**\n\nCheck the bot console for:\n• Complete FinCoT-TA prompt\n• Gemini raw response\n• Parsed trade analysis'
+          });
+        }
+        
         logDiscordInteraction('EDIT_REPLY', {
-          commandName: 'promptcheck',
+          commandName: interaction.commandName,
           message: 'Prompt logging completed. Check bot console for detailed output.'
         });
-
-        await interaction.editReply({
-          content: '✅ **Prompt logging completed**\n\nCheck the bot console for the complete FinCoT-TA prompt and Gemini response details.',
-        });
-
+        
       } catch (error) {
+        // Remove from processed set if there was an error so it can be retried
+        processedInteractions.delete(interactionKey);
+        
         log('ERROR', '🔍 PROMPT CHECK: Error during prompt logging', error.message);
         
         logDiscordInteraction('ERROR', {
-          commandName: 'promptcheck',
+          commandName: interaction.commandName,
           error: error.message
         });
 
