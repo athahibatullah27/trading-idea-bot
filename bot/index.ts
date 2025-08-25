@@ -1339,7 +1339,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
         
         log('INFO', '🔍 PROMPT CHECK: Market data fetched, generating trade idea to capture prompt and response...');
 
-        // Generate trade idea (this will log the complete prompt and Gemini's response)
+        // Generate the complete prompt for logging
+        const completePrompt = buildEnhancedDerivativesTradePrompt(sampleMarketData);
+        
+        // Log the complete prompt
+        console.log('\n' + '='.repeat(80));
+        console.log('🔍 PROMPT CHECK: COMPLETE PROMPT SENT TO GEMINI');
+        console.log('='.repeat(80));
+        console.log(completePrompt);
+        console.log('='.repeat(80) + '\n');
+        
+        // Generate trade idea with special debug context
         const tradeIdea = await generateDerivativesTradeIdea(sampleMarketData, 'promptcheck-debug');
 
         log('INFO', '🔍 PROMPT CHECK: Prompt logging completed successfully');
