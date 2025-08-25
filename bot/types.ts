@@ -143,4 +143,26 @@ export interface EnhancedDerivativesMarketData {
     volumeTrend: string;
     averageVolume: number;
   };
+  btcContext: {
+    price: number;
+    dominance: number;
+    volume24h: number;
+    recentCandles1h: Array<{
+      open: number;
+      high: number;
+      low: number;
+      close: number;
+      volume: number;
+      timestamp: number;
+    }>;
+    recentCandles4h: Array<{
+      open: number;
+      high: number;
+      low: number;
+      close: number;
+      volume: number;
+      timestamp: number;
+    }>;
+    dataTimestamp: string;
+  };
 }

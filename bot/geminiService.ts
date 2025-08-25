@@ -431,7 +431,7 @@ export async function generateDerivativesTradeIdea(
 }
 
 export function buildEnhancedDerivativesTradePrompt(marketData: EnhancedDerivativesMarketData): string {
-  const { symbol, timeframes, market } = marketData;
+  const { symbol, timeframes, market, btcContext } = marketData;
   
   return `You are an expert derivatives trader implementing the FinCoT-TA (Financial Chain-of-Thought Technical Analysis) framework. This systematic approach combines multi-timeframe analysis, signal confluence scoring, and structured reasoning for high-probability trade identification with capital preservation as the primary objective.
 
@@ -589,6 +589,18 @@ DATA:
         `{"O": ${c.open.toFixed(5)}, "H": ${c.high.toFixed(5)}, "L": ${c.low.toFixed(5)}, "C": ${c.close.toFixed(5)}, "V": ${c.volume.toFixed(0)}}`
       ).join(', ')}]
     },
+    "BITCOIN CONTEXT": {
+      "BTCUSDT Price": ${btcContext.price.toFixed(2)},
+      "BTC Dominance": ${btcContext.dominance.toFixed(1)},
+      "BTC 24h Volume": ${btcContext.volume24h.toFixed(0)},
+      "BTC Recent Candles 1h (OHLCV)": [${btcContext.recentCandles1h.slice(-3).map(c => 
+        `{"O": ${c.open.toFixed(2)}, "H": ${c.high.toFixed(2)}, "L": ${c.low.toFixed(2)}, "C": ${c.close.toFixed(2)}, "V": ${c.volume.toFixed(0)}}`
+      ).join(', ')}],
+      "BTC Recent Candles 4h (OHLCV)": [${btcContext.recentCandles4h.slice(-3).map(c => 
+        `{"O": ${c.open.toFixed(2)}, "H": ${c.high.toFixed(2)}, "L": ${c.low.toFixed(2)}, "C": ${c.close.toFixed(2)}, "V": ${c.volume.toFixed(0)}}`
+      ).join(', ')}],
+      "BTC Data Timestamp": "${btcContext.dataTimestamp}"
+    },
       "Funding Rate": ${market.fundingRate.toFixed(3)}
     }
 }
@@ -663,6 +675,7 @@ Respond with ONLY a valid JSON object in this exact format:
   "technicalReasoning": [
     "FinCoT-TA Step 1: Market regime analysis shows [specific finding]",
     "FinCoT-TA Step 2: Multi-timeframe alignment indicates [specific finding]", 
+    "FinCoT-TA Step 2.5: Bitcoin correlation analysis shows [BTC influence assessment]",
     "FinCoT-TA Step 3: Signal confluence score of [X] points confirms [direction]",
     "FinCoT-TA Step 4: Risk-reward ratio of [X]:1 meets minimum threshold",
     "FinCoT-TA Step 5: Volume analysis shows [specific confirmation]",
