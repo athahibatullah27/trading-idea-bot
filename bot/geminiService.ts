@@ -377,6 +377,15 @@ export async function generateDerivativesTradeIdea(
     const response = await result.response;
     const text = response.text();
     
+    // For promptcheck command, log the complete response
+    if (context === 'promptcheck-debug') {
+      console.log('\n' + '='.repeat(80));
+      console.log('🔍 PROMPT CHECK: COMPLETE GEMINI RESPONSE');
+      console.log('='.repeat(80));
+      console.log(text);
+      console.log('='.repeat(80) + '\n');
+    }
+    
     logApiResponse({
       status: 200,
       data: {
@@ -421,7 +430,7 @@ export async function generateDerivativesTradeIdea(
   }
 }
 
-function buildEnhancedDerivativesTradePrompt(marketData: EnhancedDerivativesMarketData): string {
+export function buildEnhancedDerivativesTradePrompt(marketData: EnhancedDerivativesMarketData): string {
   const { symbol, timeframes, market } = marketData;
   
   return `You are an expert derivatives trader specializing in multi-timeframe technical analysis, with a primary focus on capital preservation and identifying high-probability setups. Your analysis must be solely based on the provided technical data.

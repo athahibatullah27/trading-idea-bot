@@ -11,6 +11,7 @@ import { commands } from './commands.js';
 import { fetchCoinDeskNews, testCoinDeskAPI } from './newsService.js';
 import { getEnhancedDerivativesMarketData, testBinanceFuturesAPI } from './derivativesDataService.js';
 import { generateDerivativesTradeIdea, DerivativesTradeIdea } from './geminiService.js';
+import { buildEnhancedDerivativesTradePrompt } from './geminiService.js';
 import { supabase } from './supabaseClient.js';
 import { storeTradeRecommendation, evaluatePendingRecommendations, getEvaluationStats } from './evaluationService.js';
 import { 
@@ -509,6 +510,234 @@ async function registerSlashCommands() {
 // Add a Set to track processed interactions to prevent duplicates
 const processedInteractions = new Set<string>();
 
+// Helper function to build complete prompt for logging (same as in geminiService.ts)
+function buildCompletePromptForLogging(marketData: any): string {
+  const { symbol, timeframes, market } = marketData;
+  
+  return `You are an expert derivatives trader specializing in multi-timeframe technical analysis, with a primary focus on capital preservation and identifying high-probability setups. Your analysis must be solely based on the provided technical data using the FinCoT-TA (Financial Chain-of-Thought for Technical Analysis) Framework.
+
+DATA:
+{
+    "symbol": "${symbol}",
+    "dataTimestamp": "${marketData.dataTimestamp}",
+    "4-HOUR TIMEFRAME ANALYSIS": {
+      "Current Price": ${timeframes['4h'].indicators.currentPrice.toFixed(5)},
+      "Market Regime": "${timeframes['4h'].marketRegime}",
+      "RSI (14)": ${timeframes['4h'].indicators.rsi.toFixed(1)},
+      "RSI Trend": "${timeframes['4h'].indicators.rsiTrend}",
+      "MACD": ${timeframes['4h'].indicators.macd.macd.toFixed(2)},
+      "MACD Signal": ${timeframes['4h'].indicators.macd.signal.toFixed(2)},
+      "MACD Histogram": ${timeframes['4h'].indicators.macd.histogram.toFixed(2)},
+      "MACD Trend": "${timeframes['4h'].indicators.macd.trend}",
+      "Bollinger Bands Upper": ${timeframes['4h'].indicators.bollinger.upper.toFixed(5)},
+      "Bollinger Bands Middle": ${timeframes['4h'].indicators.bollinger.middle.toFixed(5)},
+      "Bollinger Bands Lower": ${timeframes['4h'].indicators.bollinger.lower.toFixed(5)},
+      "Bollinger Bands State": "${timeframes['4h'].indicators.bollinger.trend}",
+      "EMA 20": ${timeframes['4h'].indicators.ema20.toFixed(5)},
+      "EMA 50": ${timeframes['4h'].indicators.ema50.toFixed(5)},
+      "EMA Trend": "${timeframes['4h'].indicators.emaTrend}",
+      "Support Levels": [${timeframes['4h'].indicators.support.map(s => s.toFixed(5)).join(', ')}],
+      "Resistance Levels": [${timeframes['4h'].indicators.resistance.map(r => r.toFixed(5)).join(', ')}],
+      "Fibonacci Retracement": {
+        "Swing High (0%)": ${timeframes['4h'].indicators.fibonacci.retracement.level_0.toFixed(5)},
+        "23.6%": ${timeframes['4h'].indicators.fibonacci.retracement.level_236.toFixed(5)},
+        "38.2%": ${timeframes['4h'].indicators.fibonacci.retracement.level_382.toFixed(5)},
+        "50%": ${timeframes['4h'].indicators.fibonacci.retracement.level_500.toFixed(5)},
+        "61.8%": ${timeframes['4h'].indicators.fibonacci.retracement.level_618.toFixed(5)},
+        "78.6%": ${timeframes['4h'].indicators.fibonacci.retracement.level_786.toFixed(5)},
+        "Swing Low (100%)": ${timeframes['4h'].indicators.fibonacci.retracement.level_1000.toFixed(5)}
+      },
+      "Fibonacci Extension": {
+        "127.2%": ${timeframes['4h'].indicators.fibonacci.extension.level_1272.toFixed(5)},
+        "161.8%": ${timeframes['4h'].indicators.fibonacci.extension.level_1618.toFixed(5)},
+        "261.8%": ${timeframes['4h'].indicators.fibonacci.extension.level_2618.toFixed(5)}
+      },
+      "Fibonacci Trend": "${timeframes['4h'].indicators.fibonacci.trend}",
+      "Recent Candles (OHLCV)": [${timeframes['4h'].price.recentOHLCV.slice(-3).map(c => 
+        `{"O": ${c.open.toFixed(5)}, "H": ${c.high.toFixed(5)}, "L": ${c.low.toFixed(5)}, "C": ${c.close.toFixed(5)}, "V": ${c.volume.toFixed(0)}}`
+      ).join(', ')}]
+    },
+    "1-HOUR TIMEFRAME ANALYSIS": {
+      "Current Price": ${timeframes['1h'].indicators.currentPrice.toFixed(5)},
+      "Market Regime": "${timeframes['1h'].marketRegime}",
+      "RSI (14)": ${timeframes['1h'].indicators.rsi.toFixed(1)},
+      "RSI Trend": "${timeframes['1h'].indicators.rsiTrend}",
+      "MACD": ${timeframes['1h'].indicators.macd.macd.toFixed(2)},
+      "MACD Signal": ${timeframes['1h'].indicators.macd.signal.toFixed(2)},
+      "MACD Histogram": ${timeframes['1h'].indicators.macd.histogram.toFixed(2)},
+      "MACD Trend": "${timeframes['1h'].indicators.macd.trend}",
+      "Bollinger Bands Upper": ${timeframes['1h'].indicators.bollinger.upper.toFixed(5)},
+      "Bollinger Bands Middle": ${timeframes['1h'].indicators.bollinger.middle.toFixed(5)},
+      "Bollinger Bands Lower": ${timeframes['1h'].indicators.bollinger.lower.toFixed(5)},
+      "Bollinger Bands State": "${timeframes['1h'].indicators.bollinger.trend}",
+      "EMA 20": ${timeframes['1h'].indicators.ema20.toFixed(5)},
+      "EMA 50": ${timeframes['1h'].indicators.ema50.toFixed(5)},
+      "EMA Trend": "${timeframes['1h'].indicators.emaTrend}",
+      "Support Levels": [${timeframes['1h'].indicators.support.map(s => s.toFixed(5)).join(', ')}],
+      "Resistance Levels": [${timeframes['1h'].indicators.resistance.map(r => r.toFixed(5)).join(', ')}],
+      "Fibonacci Retracement": {
+        "Swing High (0%)": ${timeframes['1h'].indicators.fibonacci.retracement.level_0.toFixed(5)},
+        "23.6%": ${timeframes['1h'].indicators.fibonacci.retracement.level_236.toFixed(5)},
+        "38.2%": ${timeframes['1h'].indicators.fibonacci.retracement.level_382.toFixed(5)},
+        "50%": ${timeframes['1h'].indicators.fibonacci.retracement.level_500.toFixed(5)},
+        "61.8%": ${timeframes['1h'].indicators.fibonacci.retracement.level_618.toFixed(5)},
+        "78.6%": ${timeframes['1h'].indicators.fibonacci.retracement.level_786.toFixed(5)},
+        "Swing Low (100%)": ${timeframes['1h'].indicators.fibonacci.retracement.level_1000.toFixed(5)}
+      },
+      "Fibonacci Extension": {
+        "127.2%": ${timeframes['1h'].indicators.fibonacci.extension.level_1272.toFixed(5)},
+        "161.8%": ${timeframes['1h'].indicators.fibonacci.extension.level_1618.toFixed(5)},
+        "261.8%": ${timeframes['1h'].indicators.fibonacci.extension.level_2618.toFixed(5)}
+      },
+      "Fibonacci Trend": "${timeframes['1h'].indicators.fibonacci.trend}",
+      "Recent Candles (OHLCV)": [${timeframes['1h'].price.recentOHLCV.slice(-3).map(c => 
+        `{"O": ${c.open.toFixed(5)}, "H": ${c.high.toFixed(5)}, "L": ${c.low.toFixed(5)}, "C": ${c.close.toFixed(5)}, "V": ${c.volume.toFixed(0)}}`
+      ).join(', ')}]
+    },
+      "Funding Rate": ${market.fundingRate.toFixed(3)}
+    }
+}
+
+FINCOT-TA FRAMEWORK INSTRUCTIONS:
+
+**MARKET REGIME MATRIX** (Use this to interpret signals contextually):
+
+| Market Regime | Defining Indicators | Primary Signals to Prioritize | Secondary Confirmation Signals |
+|---------------|-------------------|-------------------------------|--------------------------------|
+| Trending (Bullish) | Price consistently above MA50 & MA200; EMA Trend = bullish | MA Crossover, Pullbacks to MA Support | Volume Confirmation, RSI > 50 |
+| Trending (Bearish) | Price consistently below MA50 & MA200; EMA Trend = bearish | MA Crossover, Pullbacks to MA Resistance | Volume Confirmation, RSI < 50 |
+| Ranging | Price moving between clear support/resistance levels | Support/Resistance tests; RSI overbought/oversold levels | Volume Profile analysis |
+| Volatile | Bollinger Band Width > 1.5x average width; High ATR | Volatility-based signals; Order flow patterns | Volume spikes, Order book imbalances |
+| Quiet | Bollinger Band Width < 0.8x average width; Low ATR | No-Trade Recommendation; Wait for breakouts | Low volume, Tight trading range |
+
+**SIGNAL CONFLUENCE SCORE TABLE** (Use this to quantify setup strength):
+
+| Signal Type | Weighting Score |
+|-------------|----------------|
+| MA Trend Alignment (4h and 1h EMAs aligned) | +2 |
+| RSI Momentum (Aligned with Trend) | +2 |
+| Volume Confirmation (Rising on Uptrend, etc.) | +3 |
+| Candlestick Pattern (e.g., Hammer, Engulfing) | +3 |
+| Fibonacci Retracement (61.8% or 50% Respect) | +4 |
+| Chart Pattern (e.g., Bullish Flag, Cup & Handle) | +5 |
+| Order Flow Signal (e.g., Absorption, Imbalance) | +5 |
+
+**CONFIDENCE CALIBRATION RULES**:
+- Total Confluence Score 15+: High Confidence (85-95%)
+- Total Confluence Score 10-14: Medium-High (75-84%)
+- Total Confluence Score 6-9: Medium (65-74%)
+- Total Confluence Score <6: No Trade (confidence <75%)
+
+**<thinking>**
+**PHASE I: CONTEXTUAL & MARKET REGIME ANALYSIS**
+First, I must identify the market regime for each timeframe using the Market Regime Matrix:
+
+4-Hour Analysis:
+- Market Regime: "${timeframes['4h'].marketRegime}"
+- EMA Trend: "${timeframes['4h'].indicators.emaTrend}" (EMA20: ${timeframes['4h'].indicators.ema20.toFixed(0)} vs EMA50: ${timeframes['4h'].indicators.ema50.toFixed(0)})
+- Price Position: Current price ${timeframes['4h'].indicators.currentPrice.toFixed(0)} relative to EMAs
+- Confirmation: Assess alignment with Market Regime Matrix
+
+1-Hour Analysis:
+- Market Regime: "${timeframes['1h'].marketRegime}"
+- EMA Trend: "${timeframes['1h'].indicators.emaTrend}" (EMA20: ${timeframes['1h'].indicators.ema20.toFixed(0)} vs EMA50: ${timeframes['1h'].indicators.ema50.toFixed(0)})
+- Price Position: Current price ${timeframes['1h'].indicators.currentPrice.toFixed(0)} relative to EMAs
+- Confirmation: Assess alignment with Market Regime Matrix
+
+**REGIME CONFLICT ASSESSMENT**: Compare 4h vs 1h regimes and identify any conflicts. Per FinCoT-TA framework, prioritize the higher timeframe (4h) for primary trend direction.
+
+**PHASE II: ADVANCED SIGNAL CONFLUENCE & QUANTIFICATION**
+Systematically assess each signal type from the Signal Confluence Score Table:
+
+1. **MA Trend Alignment** (+2 points): 
+   - 4h: EMA20 vs EMA50 relationship
+   - 1h: EMA20 vs EMA50 relationship
+   - Assessment: Full/Partial/No alignment
+   - Score: 0-2 points
+
+2. **RSI Momentum** (+2 points):
+   - 4h RSI: ${timeframes['4h'].indicators.rsi.toFixed(1)} (${timeframes['4h'].indicators.rsiTrend} trend)
+   - 1h RSI: ${timeframes['1h'].indicators.rsi.toFixed(1)} (${timeframes['1h'].indicators.rsiTrend} trend)
+   - Assessment: Aligned/Conflicting with trend
+   - Score: 0-2 points
+
+3. **Volume Confirmation** (+3 points):
+   - Volume Trend: "${market.volumeTrend}"
+   - Assessment: Supports/Contradicts price action
+   - Score: 0-3 points
+
+4. **Candlestick Pattern** (+3 points):
+   - 4h: Analyze recent OHLCV data for patterns
+   - 1h: Analyze recent OHLCV data for patterns
+   - Assessment: Strong/Weak/No patterns
+   - Score: 0-3 points
+
+5. **Fibonacci Retracement** (+4 points):
+   - 4h: Current price vs key Fibonacci levels
+   - 1h: Current price vs key Fibonacci levels
+   - Assessment: Strong/Weak confluence
+   - Score: 0-4 points
+
+6. **Chart Pattern** (+5 points):
+   - Assessment: Identify any chart patterns
+   - Score: 0-5 points
+
+7. **Order Flow Signal** (+5 points):
+   - Assessment: Based on available data
+   - Score: 0-5 points
+
+**TOTAL CONFLUENCE SCORE: [Calculate sum of all scores]**
+
+**PHASE III: MULTI-TIMEFRAME VALIDATION**
+- Primary Trend (4h): [Analysis]
+- Secondary Confirmation (1h): [Analysis]
+- Fibonacci Confluence: [Analysis]
+- Volume: [Analysis]
+
+**PHASE IV: EXPLICIT CONFLICT RESOLUTION**
+**<reconciliation>**
+Key conflicts identified:
+1. [List any conflicts between timeframes or indicators]
+2. [Additional conflicts]
+
+Resolution Logic:
+- [Explain how conflicts are resolved]
+- [Prioritization logic]
+- [Final reconciliation]
+
+**PHASE V: CONFIDENCE CALIBRATION & FINAL DECISION**
+- Total Confluence Score: [X] points
+- Per calibration rules: [Confidence range]
+- Risk-reward assessment for final decision
+
+Entry Analysis:
+- Current price: [Analysis]
+- Potential target: [Analysis]
+- Stop loss: [Analysis]
+
+Risk-Reward Calculation:
+- Entry: [Price]
+- Target: [Price]
+- Stop: [Price]
+- Risk: [Amount], Reward: [Amount]
+- R:R Ratio: [Ratio]:1
+
+**DECISION**: [Final decision with reasoning]
+**</thinking>**
+
+**<output>**
+Based on the FinCoT-TA framework analysis, provide your systematic assessment and final trade recommendation.
+
+Respond ONLY with a valid JSON object in this exact format:
+{ "direction": "long" | "short" | "no_trade_due_to_conflict", "entry": [price] | 0.0, "targetPrice": [price] | 0.0, "stopLoss": [price] | 0.0, "riskReward": [ratio] | 0.0, "confidence": [0-95] | "N/A", "technicalReasoning": [ "reason1", "reason2", "reason3", "reason4", "reason5", "reason6" ], "timeframe": "6-24 hours" | "No trade recommended" }
+
+- Ensure all prices are realistic numbers with appropriate precision based on the asset's price level.
+- If 'direction' is 'no_trade_due_to_conflict', set 'entry', 'targetPrice', 'stopLoss', and 'riskReward' to 0.0, and 'confidence' to 'N/A' or below 75%.
+- 'confidence' must be between 75-95 for high-quality setups.
+- 'riskReward' is a decimal (e.g., 3.0).
+- 'technicalReasoning' must contain 5-6 items, explicitly focusing on market regime alignment, multi-timeframe analysis, Fibonacci confluences, trend alignment, momentum, and volume confirmation, ordered by their impact on the decision.
+**</output>**`;
+}
 // Handle slash command interactions
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
