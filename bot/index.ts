@@ -1161,6 +1161,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const tradeIdea = await generateDerivativesTradeIdea(marketData, 'derivativetrade command');
         
         if (!tradeIdea) {
+          // Additional check before processing
+          if (interaction.replied || interaction.deferred === false) {
+            log('ERROR', 'Interaction state invalid for promptcheck');
+            return;
+          }
+          
           logDiscordInteraction('EDIT_REPLY', { 
             commandName: interaction.commandName, 
             message: `Unable to generate trade idea for ${finalSymbol}. Please try again later.`
@@ -1178,6 +1184,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
             const targetPrice = tradeIdea.direction === 'long' ? 
               tradeIdea.entry + (riskAmount * tradeIdea.riskReward) :
               tradeIdea.entry - (riskAmount * tradeIdea.riskReward);
+            // Final check before editing reply
+            if (!interaction.deferred) {
+              log('ERROR', 'Cannot edit reply - interaction not deferred');
+              return;
+            }
             
             // Map DerivativesTradeIdea to TradingRecommendation format
             const mappedRecommendation: TradingRecommendation = {
@@ -1190,15 +1201,20 @@ client.on(Events.InteractionCreate, async (interaction) => {
               timeframe: tradeIdea.timeframe,
               riskLevel: 'high' // Derivatives trading typically carries higher risk
             };
+            // Only try to edit reply if we can
+            if (interaction.deferred && !interaction.replied) {
+              try {
+                await interaction.editReply({
+                  content: 'Error occurred during prompt logging. Check bot console for details.'
+                });
+              } catch (replyError) {
+                log('ERROR', 'Failed to send error reply', replyError.message);
+              }
+            }
             
             // Store in Supabase with entry price
             const stored = await storeTradeRecommendation(mappedRecommendation, tradeIdea.entry);
             
-            if (stored) {
-              log('INFO', `Stored derivatives trade idea for ${symbol} in database`);
-            } else {
-              log('WARN', `Failed to store derivatives trade idea for ${symbol} in database`);
-            }
           } catch (storeError) {
             log('ERROR', 'Error storing derivatives trade idea', storeError);
             // Don't fail the command if storage fails, just log the error
