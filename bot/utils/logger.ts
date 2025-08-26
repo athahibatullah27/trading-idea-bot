@@ -129,6 +129,8 @@ export function logDiscordInteraction(type: 'COMMAND_RECEIVED' | 'DEFER_REPLY' |
   channelId?: string;
   message?: string;
   error?: any;
+  description?: string;
+  crypto?: string;
 }): void {
   const timestamp = formatTimestamp();
   const emoji = type === 'COMMAND_RECEIVED' ? '🎯' :
@@ -156,6 +158,14 @@ export function logDiscordInteraction(type: 'COMMAND_RECEIVED' | 'DEFER_REPLY' |
   
   if (details.message) {
     console.log(`  💭 Message: ${details.message.substring(0, 200)}${details.message.length > 200 ? '...' : ''}`);
+  }
+  
+  if (details.description) {
+    console.log(`  📝 Description: ${details.description.substring(0, 200)}${details.description.length > 200 ? '...' : ''}`);
+  }
+  
+  if (details.crypto) {
+    console.log(`  💰 Crypto: ${details.crypto}`);
   }
   
   if (details.error) {

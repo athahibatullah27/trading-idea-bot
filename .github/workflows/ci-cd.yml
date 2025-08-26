@@ -3,12 +3,15 @@ name: Docker CI/CD
 
 # Events that trigger this workflow
 on:
+  # push:
+  #   branches:
+  #     - master # Trigger on pushes to the 'main' branch
+  # pull_request:
+  #   branches:
+  #     - master # Trigger on pull requests targeting 'main'
   push:
     branches:
-      - master # Trigger on pushes to the 'main' branch
-  pull_request:
-    branches:
-      - master # Trigger on pull requests targeting 'main'
+      - prompt-enhancement # Trigger on pushes to the 'insert-branch-name' branch
 
 # Define one or more jobs
 jobs:
@@ -26,12 +29,12 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }} # Accesses a GitHub Secret for password
 
       - name: Build Docker image # Step 3: Build your Docker image
-        run: docker build . --file Dockerfile --tag your-docker-repo/your-image-name:${{ github.sha }} # Runs a shell command to build the image
+        run: docker build . --file Dockerfile --tag iscav/trade-bot-backend:latest # Runs a shell command to build the image
         # Replace 'your-docker-repo/your-image-name' with your actual Docker repository and image name.
         # ${{ github.sha }} is a built-in variable that provides the commit SHA, useful for unique tags.
 
       - name: Push Docker image # Step 4: Push the built image to the registry
-        run: docker push your-docker-repo/your-image-name:${{ github.sha }} # Runs a shell command to push the image
+        run: docker push iscav/trade-bot-backend:latest # Runs a shell command to push the image
 
       # You would add more steps here for testing, e.g.,
       # - name: Run tests
@@ -48,20 +51,24 @@ jobs:
           host: ${{ secrets.SSH_HOST }} # IP address or hostname of your server
           username: ${{ secrets.SSH_USERNAME }} # SSH username for your server
           key: ${{ secrets.SSH_PRIVATE_KEY }} # Your SSH private key (stored as a GitHub Secret)
-          script: | # Commands to execute on the remote server
+          script: |
             echo "Connecting to production server..."
-            # Navigate to your application's directory on the server
-            cd trading-idea-bot/ 
-
-            # Pull the latest Docker image from your registry
-            # Replace 'your-docker-repo/your-image-name' with your actual image name
-            # and 'your-service-name' with the service name from your docker-compose.yml
             echo "Pulling latest Docker image..."
-            docker compose pull backend # Assuming 'backend' is the service name in your docker-compose.yml
-
-            # Stop and remove the old container, then start a new one with the updated image
-            # The '--no-deps' flag ensures only the specified service is updated, not its dependencies
+            cd ~/trading-idea-bot && docker compose pull backend
             echo "Updating and restarting backend service..."
-            docker compose up -d --no-deps backend
+            cd ~/trading-idea-bot && docker compose up -d backend
+            
+            # Clean up old Docker images to save disk space
+            echo "Cleaning up old Docker images..."
+            docker image prune -f
+            
+            # Verify the service is running
+            echo "Verifying deployment..."
+            docker compose ps backend
+            
+            # Optional: Check if the API is responding
+            echo "Testing API connectivity..."
+            sleep 5  # Give the service a moment to start
+            curl -f http://localhost:3001/api/test-connection || echo "API test failed, but deployment completed"
 
             echo "Deployment complete!"
