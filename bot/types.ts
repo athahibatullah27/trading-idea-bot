@@ -134,8 +134,11 @@ export interface EnhancedDerivativesMarketData {
   symbol: string;
   dataTimestamp: string;
   timeframes: {
+    '1d': TimeframeData;
     '4h': TimeframeData;
     '1h': TimeframeData;
+    '30m': TimeframeData;
+    '15m': TimeframeData;
   };
   market: {
     fundingRate: number;

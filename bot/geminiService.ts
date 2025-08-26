@@ -437,12 +437,13 @@ export function buildEnhancedDerivativesTradePrompt(marketData: EnhancedDerivati
 
 ## FinCoT-TA FRAMEWORK OVERVIEW
 
-The FinCoT-TA framework employs a systematic 5-step process:
-1. **Market Regime Classification** - Identify dominant market structure
-2. **Multi-Timeframe Signal Analysis** - Analyze 4h (primary) and 1h (confirmation) timeframes
-3. **Signal Confluence Scoring** - Weight and score technical signals
-4. **Risk-Reward Assessment** - Calculate position sizing and risk parameters
-5. **Structured Decision Output** - Generate systematic trade recommendation
+The FinCoT-TA framework employs a systematic 6-step process:
+1. **Macro Trend & Market Regime Classification** - Establish dominant market structure using Daily and 4h timeframes
+2. **Multi-Timeframe Signal Alignment** - Analyze signals across Daily, 4h, and 1h timeframes
+3. **High-Precision Signal Analysis (15m/30m)** - Use lowest timeframes to pinpoint precise entry
+4. **Signal Confluence Scoring** - Weight and score technical signals
+5. **Risk-Reward Assessment** - Calculate position sizing and risk parameters
+6. **Structured Decision Output** - Generate systematic trade recommendation
 
 ## MARKET REGIME CLASSIFICATION MATRIX
 
@@ -458,9 +459,9 @@ The FinCoT-TA framework employs a systematic 5-step process:
 ## SIGNAL CONFLUENCE SCORING SYSTEM
 
 ### Primary Signals (Weight: 25 points each)
-- **Multi-Timeframe Trend Alignment**: 4h and 1h trends in same direction
+- **Multi-Timeframe Trend Alignment**: Daily, 4h, and 1h trends in same direction
 - **Volume Confirmation**: Above-average volume supporting price direction
-- **Market Regime Consistency**: Both timeframes show same regime type
+- **Market Regime Consistency**: All timeframes show same regime type
 
 ### Secondary Signals (Weight: 15 points each)
 - **Fibonacci Confluence**: Price at key Fib levels (38.2%, 50%, 61.8%)
@@ -515,6 +516,43 @@ DATA:
 {
     "symbol": "${symbol}",
     "dataTimestamp": "${marketData.dataTimestamp}",
+    "1-DAY TIMEFRAME ANALYSIS": {
+      "Current Price": ${timeframes['1d'].indicators.currentPrice.toFixed(5)},
+      "Market Regime": "${timeframes['1d'].marketRegime}",
+      "RSI (14)": ${timeframes['1d'].indicators.rsi.toFixed(1)},
+      "RSI Trend": "${timeframes['1d'].indicators.rsiTrend}",
+      "MACD": ${timeframes['1d'].indicators.macd.macd.toFixed(2)},
+      "MACD Signal": ${timeframes['1d'].indicators.macd.signal.toFixed(2)},
+      "MACD Histogram": ${timeframes['1d'].indicators.macd.histogram.toFixed(2)},
+      "MACD Trend": "${timeframes['1d'].indicators.macd.trend}",
+      "Bollinger Bands Upper": ${timeframes['1d'].indicators.bollinger.upper.toFixed(5)},
+      "Bollinger Bands Middle": ${timeframes['1d'].indicators.bollinger.middle.toFixed(5)},
+      "Bollinger Bands Lower": ${timeframes['1d'].indicators.bollinger.lower.toFixed(5)},
+      "Bollinger Bands State": "${timeframes['1d'].indicators.bollinger.trend}",
+      "EMA 20": ${timeframes['1d'].indicators.ema20.toFixed(5)},
+      "EMA 50": ${timeframes['1d'].indicators.ema50.toFixed(5)},
+      "EMA Trend": "${timeframes['1d'].indicators.emaTrend}",
+      "Support Levels": [${timeframes['1d'].indicators.support.map(s => s.toFixed(5)).join(', ')}],
+      "Resistance Levels": [${timeframes['1d'].indicators.resistance.map(r => r.toFixed(5)).join(', ')}],
+      "Fibonacci Retracement": {
+        "Swing High (0%)": ${timeframes['1d'].indicators.fibonacci.retracement.level_0.toFixed(5)},
+        "23.6%": ${timeframes['1d'].indicators.fibonacci.retracement.level_236.toFixed(5)},
+        "38.2%": ${timeframes['1d'].indicators.fibonacci.retracement.level_382.toFixed(5)},
+        "50%": ${timeframes['1d'].indicators.fibonacci.retracement.level_500.toFixed(5)},
+        "61.8%": ${timeframes['1d'].indicators.fibonacci.retracement.level_618.toFixed(5)},
+        "78.6%": ${timeframes['1d'].indicators.fibonacci.retracement.level_786.toFixed(5)},
+        "Swing Low (100%)": ${timeframes['1d'].indicators.fibonacci.retracement.level_1000.toFixed(5)}
+      },
+      "Fibonacci Extension": {
+        "127.2%": ${timeframes['1d'].indicators.fibonacci.extension.level_1272.toFixed(5)},
+        "161.8%": ${timeframes['1d'].indicators.fibonacci.extension.level_1618.toFixed(5)},
+        "261.8%": ${timeframes['1d'].indicators.fibonacci.extension.level_2618.toFixed(5)}
+      },
+      "Fibonacci Trend": "${timeframes['1d'].indicators.fibonacci.trend}",
+      "Recent Candles (OHLCV)": [${timeframes['1d'].price.recentOHLCV.slice(-3).map(c => 
+        `{"O": ${c.open.toFixed(5)}, "H": ${c.high.toFixed(5)}, "L": ${c.low.toFixed(5)}, "C": ${c.close.toFixed(5)}, "V": ${c.volume.toFixed(0)}}`
+      ).join(', ')}]
+    },
     "4-HOUR TIMEFRAME ANALYSIS": {
       "Current Price": ${timeframes['4h'].indicators.currentPrice.toFixed(5)},
       "Market Regime": "${timeframes['4h'].marketRegime}",
@@ -589,6 +627,80 @@ DATA:
         `{"O": ${c.open.toFixed(5)}, "H": ${c.high.toFixed(5)}, "L": ${c.low.toFixed(5)}, "C": ${c.close.toFixed(5)}, "V": ${c.volume.toFixed(0)}}`
       ).join(', ')}]
     },
+    "30-MINUTE TIMEFRAME ANALYSIS": {
+      "Current Price": ${timeframes['30m'].indicators.currentPrice.toFixed(5)},
+      "Market Regime": "${timeframes['30m'].marketRegime}",
+      "RSI (14)": ${timeframes['30m'].indicators.rsi.toFixed(1)},
+      "RSI Trend": "${timeframes['30m'].indicators.rsiTrend}",
+      "MACD": ${timeframes['30m'].indicators.macd.macd.toFixed(2)},
+      "MACD Signal": ${timeframes['30m'].indicators.macd.signal.toFixed(2)},
+      "MACD Histogram": ${timeframes['30m'].indicators.macd.histogram.toFixed(2)},
+      "MACD Trend": "${timeframes['30m'].indicators.macd.trend}",
+      "Bollinger Bands Upper": ${timeframes['30m'].indicators.bollinger.upper.toFixed(5)},
+      "Bollinger Bands Middle": ${timeframes['30m'].indicators.bollinger.middle.toFixed(5)},
+      "Bollinger Bands Lower": ${timeframes['30m'].indicators.bollinger.lower.toFixed(5)},
+      "Bollinger Bands State": "${timeframes['30m'].indicators.bollinger.trend}",
+      "EMA 20": ${timeframes['30m'].indicators.ema20.toFixed(5)},
+      "EMA 50": ${timeframes['30m'].indicators.ema50.toFixed(5)},
+      "EMA Trend": "${timeframes['30m'].indicators.emaTrend}",
+      "Support Levels": [${timeframes['30m'].indicators.support.map(s => s.toFixed(5)).join(', ')}],
+      "Resistance Levels": [${timeframes['30m'].indicators.resistance.map(r => r.toFixed(5)).join(', ')}],
+      "Fibonacci Retracement": {
+        "Swing High (0%)": ${timeframes['30m'].indicators.fibonacci.retracement.level_0.toFixed(5)},
+        "23.6%": ${timeframes['30m'].indicators.fibonacci.retracement.level_236.toFixed(5)},
+        "38.2%": ${timeframes['30m'].indicators.fibonacci.retracement.level_382.toFixed(5)},
+        "50%": ${timeframes['30m'].indicators.fibonacci.retracement.level_500.toFixed(5)},
+        "61.8%": ${timeframes['30m'].indicators.fibonacci.retracement.level_618.toFixed(5)},
+        "78.6%": ${timeframes['30m'].indicators.fibonacci.retracement.level_786.toFixed(5)},
+        "Swing Low (100%)": ${timeframes['30m'].indicators.fibonacci.retracement.level_1000.toFixed(5)}
+      },
+      "Fibonacci Extension": {
+        "127.2%": ${timeframes['30m'].indicators.fibonacci.extension.level_1272.toFixed(5)},
+        "161.8%": ${timeframes['30m'].indicators.fibonacci.extension.level_1618.toFixed(5)},
+        "261.8%": ${timeframes['30m'].indicators.fibonacci.extension.level_2618.toFixed(5)}
+      },
+      "Fibonacci Trend": "${timeframes['30m'].indicators.fibonacci.trend}",
+      "Recent Candles (OHLCV)": [${timeframes['30m'].price.recentOHLCV.slice(-3).map(c => 
+        `{"O": ${c.open.toFixed(5)}, "H": ${c.high.toFixed(5)}, "L": ${c.low.toFixed(5)}, "C": ${c.close.toFixed(5)}, "V": ${c.volume.toFixed(0)}}`
+      ).join(', ')}]
+    },
+    "15-MINUTE TIMEFRAME ANALYSIS": {
+      "Current Price": ${timeframes['15m'].indicators.currentPrice.toFixed(5)},
+      "Market Regime": "${timeframes['15m'].marketRegime}",
+      "RSI (14)": ${timeframes['15m'].indicators.rsi.toFixed(1)},
+      "RSI Trend": "${timeframes['15m'].indicators.rsiTrend}",
+      "MACD": ${timeframes['15m'].indicators.macd.macd.toFixed(2)},
+      "MACD Signal": ${timeframes['15m'].indicators.macd.signal.toFixed(2)},
+      "MACD Histogram": ${timeframes['15m'].indicators.macd.histogram.toFixed(2)},
+      "MACD Trend": "${timeframes['15m'].indicators.macd.trend}",
+      "Bollinger Bands Upper": ${timeframes['15m'].indicators.bollinger.upper.toFixed(5)},
+      "Bollinger Bands Middle": ${timeframes['15m'].indicators.bollinger.middle.toFixed(5)},
+      "Bollinger Bands Lower": ${timeframes['15m'].indicators.bollinger.lower.toFixed(5)},
+      "Bollinger Bands State": "${timeframes['15m'].indicators.bollinger.trend}",
+      "EMA 20": ${timeframes['15m'].indicators.ema20.toFixed(5)},
+      "EMA 50": ${timeframes['15m'].indicators.ema50.toFixed(5)},
+      "EMA Trend": "${timeframes['15m'].indicators.emaTrend}",
+      "Support Levels": [${timeframes['15m'].indicators.support.map(s => s.toFixed(5)).join(', ')}],
+      "Resistance Levels": [${timeframes['15m'].indicators.resistance.map(r => r.toFixed(5)).join(', ')}],
+      "Fibonacci Retracement": {
+        "Swing High (0%)": ${timeframes['15m'].indicators.fibonacci.retracement.level_0.toFixed(5)},
+        "23.6%": ${timeframes['15m'].indicators.fibonacci.retracement.level_236.toFixed(5)},
+        "38.2%": ${timeframes['15m'].indicators.fibonacci.retracement.level_382.toFixed(5)},
+        "50%": ${timeframes['15m'].indicators.fibonacci.retracement.level_500.toFixed(5)},
+        "61.8%": ${timeframes['15m'].indicators.fibonacci.retracement.level_618.toFixed(5)},
+        "78.6%": ${timeframes['15m'].indicators.fibonacci.retracement.level_786.toFixed(5)},
+        "Swing Low (100%)": ${timeframes['15m'].indicators.fibonacci.retracement.level_1000.toFixed(5)}
+      },
+      "Fibonacci Extension": {
+        "127.2%": ${timeframes['15m'].indicators.fibonacci.extension.level_1272.toFixed(5)},
+        "161.8%": ${timeframes['15m'].indicators.fibonacci.extension.level_1618.toFixed(5)},
+        "261.8%": ${timeframes['15m'].indicators.fibonacci.extension.level_2618.toFixed(5)}
+      },
+      "Fibonacci Trend": "${timeframes['15m'].indicators.fibonacci.trend}",
+      "Recent Candles (OHLCV)": [${timeframes['15m'].price.recentOHLCV.slice(-3).map(c => 
+        `{"O": ${c.open.toFixed(5)}, "H": ${c.high.toFixed(5)}, "L": ${c.low.toFixed(5)}, "C": ${c.close.toFixed(5)}, "V": ${c.volume.toFixed(0)}}`
+      ).join(', ')}]
+    },
     "BITCOIN CONTEXT": {
       "BTCUSDT Price": ${btcContext.price.toFixed(2)},
       "BTC Dominance": ${btcContext.dominance.toFixed(1)},
@@ -607,50 +719,48 @@ DATA:
 
 ## FinCoT-TA SYSTEMATIC ANALYSIS PROCESS
 
-### STEP 1: MARKET REGIME CLASSIFICATION
-**Objective**: Establish the dominant market structure using the Market Regime Classification Matrix.
+### STEP 1: MACRO TREND & MARKET REGIME CLASSIFICATION
+**Objective**: Establish the dominant market structure using the Daily and 4h timeframes.
 
 **Analysis Process:**
-1. **4-Hour Regime Identification**: Classify using EMA alignment, MACD position, RSI range, and Bollinger Band state
-2. **1-Hour Regime Confirmation**: Verify alignment or identify conflicts with 4-hour regime
-3. **Regime Consistency Score**: Award 25 points if regimes align, 0 if conflicting
+1. **Daily Regime Identification**: Classify using EMA alignment, MACD position, RSI range, and Bollinger Band state
+2. **4-Hour Regime Confirmation**: Verify alignment or identify conflicts with the Daily regime
+3. **Regime Consistency Score**: Award 25 points if Daily and 4h regimes align, 0 if conflicting
 
-### STEP 2: MULTI-TIMEFRAME SIGNAL ANALYSIS
-**Objective**: Analyze technical signals across both timeframes using the Signal Confluence Scoring System.
+### STEP 2: MULTI-TIMEFRAME SIGNAL ALIGNMENT
+**Objective**: Analyze technical signals across all timeframes. (Primary Score: 25 points)
 
-**Primary Signal Analysis (25 points each):**
-1. **Trend Alignment**: Compare EMA trends, MACD directions, and RSI trends across timeframes
-2. **Volume Confirmation**: Apply Volume Analysis Framework to recent price action
-3. **Market Regime Consistency**: Verify both timeframes support same directional bias
+**Analysis Process:**
+1. **Trend Alignment**: Compare EMA trends, MACD directions, and RSI trends across Daily, 4h, and 1h timeframes. A trade is only valid if a clear bias (bullish/bearish) is present and confirmed by the higher timeframes.
+2. **Volume Confirmation**: Apply Volume Analysis Framework to recent price action.
+3. **Market Regime Consistency**: Verify all timeframes support the same directional bias.
 
-**Secondary Signal Analysis (15 points each):**
-1. **Fibonacci Confluence**: Identify current price position relative to key Fib levels
-2. **Support/Resistance Reaction**: Analyze recent price behavior at identified S/R levels
-3. **Momentum Alignment**: Evaluate RSI positioning and MACD histogram trends
+### STEP 3: HIGH-PRECISION SIGNAL ANALYSIS (15m/30m)
+**Objective**: Use the lowest timeframes to pinpoint a precise entry. (Tertiary Score: 10 points)
 
-**Tertiary Signal Analysis (10 points each):**
-1. **Bollinger Band Position**: Current price relative to BB bands and band expansion/contraction
-2. **EMA Alignment**: Price position relative to EMA20 and EMA50
-3. **Candlestick Patterns**: Recent patterns at key technical levels
+**Analysis Process:**
+1. **Fibonacci Confluence**: Identify current price position relative to key Fib levels. Look for confluence where a low-timeframe Fib level aligns with a higher-timeframe support/resistance zone.
+2. **Support/Resistance Reaction**: Analyze recent price behavior at identified S/R levels.
+3. **Candlestick Patterns**: Analyze recent patterns for high-probability setups at key technical levels.
 
-### STEP 3: SIGNAL CONFLUENCE SCORING
+### STEP 4: SIGNAL CONFLUENCE SCORING
 **Objective**: Calculate total confluence score and determine trade viability.
 
 **Scoring Process:**
-1. **Sum All Signal Scores**: Add primary (25pts), secondary (15pts), and tertiary (10pts) signals
+1. **Sum All Signal Scores**: Add primary (25pts), secondary (15pts), and tertiary (10pts) signals from all timeframes
 2. **Apply Confidence Mapping**: Use scoring thresholds to determine confidence level
 3. **Validate Minimum Threshold**: Require ≥70 points for any trade consideration
 
-### STEP 4: RISK-REWARD ASSESSMENT
+### STEP 5: RISK-REWARD ASSESSMENT
 **Objective**: Apply Risk Management Matrix for position sizing and stop placement.
 
 **Risk Assessment Process:**
-1. **Entry Point Selection**: Use highest confluence technical level
+1. **Entry Point Selection**: Use the highest confluence technical level identified on the 15m/30m chart
 2. **Stop Loss Placement**: Apply Stop Loss Placement Hierarchy
 3. **Target Selection**: Use Target Selection Framework based on confidence level
 4. **Risk-Reward Calculation**: Ensure minimum 2:1 ratio for trade validity
 
-### STEP 5: STRUCTURED DECISION OUTPUT
+### STEP 6: STRUCTURED DECISION OUTPUT
 **Objective**: Generate systematic trade recommendation using FinCoT-TA conclusions.
 
 **Decision Logic:**
@@ -673,17 +783,19 @@ Respond with ONLY a valid JSON object in this exact format:
   "confidence": 85,
   "confluenceScore": 87,
   "technicalReasoning": [
-    "FinCoT-TA Step 1: Market regime analysis shows [specific finding]",
-    "FinCoT-TA Step 2: Multi-timeframe alignment indicates [specific finding]", 
+    "FinCoT-TA Step 1: Macro trend analysis shows [specific finding]",
+    "FinCoT-TA Step 2: Multi-timeframe alignment indicates [specific finding]",
     "FinCoT-TA Step 2.5: Bitcoin correlation analysis shows [BTC influence assessment]",
-    "FinCoT-TA Step 3: Signal confluence score of [X] points confirms [direction]",
-    "FinCoT-TA Step 4: Risk-reward ratio of [X]:1 meets minimum threshold",
-    "FinCoT-TA Step 5: Volume analysis shows [specific confirmation]",
+    "FinCoT-TA Step 3: High-precision analysis pinpoints entry at [specific level]",
+    "FinCoT-TA Step 4: Signal confluence score of [X] points confirms [direction]",
+    "FinCoT-TA Step 5: Risk-reward ratio of [X]:1 meets minimum threshold",
+    "FinCoT-TA Step 6: Volume analysis shows [specific confirmation]",
     "Key confluence: Price at [specific Fibonacci/S&R level] with [supporting factors]"
   ],
   "timeframe": "6-24 hours",
   "riskLevel": "medium",
-  "marketRegime4h": "ranging_volatile",
+  "marketRegime1d": "trending_bullish",
+  "marketRegime4h": "trending_bullish",
   "marketRegime1h": "ranging_volatile",
   "volumeConfirmation": "above_average"
 }
@@ -693,7 +805,7 @@ Respond with ONLY a valid JSON object in this exact format:
 - All prices must be realistic numbers with appropriate precision
 - Confidence must be 75-95 for valid trades, or 0 for no_trade_due_to_conflict
 - ConfluenceScore must reflect actual signal scoring calculation
-- TechnicalReasoning must reference specific FinCoT-TA steps and findings
+- TechnicalReasoning must contain 5-8 items, explicitly focusing on market regime alignment, multi-timeframe analysis, Fibonacci confluences, trend alignment, momentum, and volume confirmation, ordered by their impact on the decision
 - Risk-reward ratio must be ≥2:1 for any trade recommendation
 - If no trade, set entry/stopLoss/targetPrice to 0.0 and confidence to 0`;
 }
