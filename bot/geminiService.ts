@@ -377,6 +377,15 @@ export async function generateDerivativesTradeIdea(
     const response = await result.response;
     const text = response.text();
     
+    // For promptcheck command, log the complete response
+    if (context === 'promptcheck-debug') {
+      console.log('\n' + '='.repeat(80));
+      console.log('🔍 PROMPT CHECK: COMPLETE GEMINI RESPONSE');
+      console.log('='.repeat(80));
+      console.log(text);
+      console.log('='.repeat(80) + '\n');
+    }
+    
     logApiResponse({
       status: 200,
       data: {
@@ -421,10 +430,86 @@ export async function generateDerivativesTradeIdea(
   }
 }
 
-function buildEnhancedDerivativesTradePrompt(marketData: EnhancedDerivativesMarketData): string {
-  const { symbol, timeframes, market } = marketData;
+export function buildEnhancedDerivativesTradePrompt(marketData: EnhancedDerivativesMarketData): string {
+  const { symbol, timeframes, market, btcContext } = marketData;
   
-  return `You are an expert derivatives trader specializing in multi-timeframe technical analysis, with a primary focus on capital preservation and identifying high-probability setups. Your analysis must be solely based on the provided technical data.
+  return `You are an expert derivatives trader implementing the FinCoT-TA (Financial Chain-of-Thought Technical Analysis) framework. This systematic approach combines multi-timeframe analysis, signal confluence scoring, and structured reasoning for high-probability trade identification with capital preservation as the primary objective.
+
+## FinCoT-TA FRAMEWORK OVERVIEW
+
+The FinCoT-TA framework employs a systematic 5-step process:
+1. **Market Regime Classification** - Identify dominant market structure
+2. **Multi-Timeframe Signal Analysis** - Analyze 4h (primary) and 1h (confirmation) timeframes
+3. **Signal Confluence Scoring** - Weight and score technical signals
+4. **Risk-Reward Assessment** - Calculate position sizing and risk parameters
+5. **Structured Decision Output** - Generate systematic trade recommendation
+
+## MARKET REGIME CLASSIFICATION MATRIX
+
+| Regime | 4h Characteristics | 1h Characteristics | Trade Approach |
+|--------|-------------------|-------------------|----------------|
+| **Trending Bullish** | EMA20>EMA50, MACD>Signal, RSI 40-70 | Aligned with 4h, Volume confirms | Trend following, pullback entries |
+| **Trending Bearish** | EMA20<EMA50, MACD<Signal, RSI 30-60 | Aligned with 4h, Volume confirms | Trend following, bounce shorts |
+| **Ranging Volatile** | Price oscillating, BB expanding | High volatility, mixed signals | Range trading, breakout preparation |
+| **Ranging Quiet** | Price consolidating, BB contracting | Low volatility, neutral momentum | Breakout anticipation, tight stops |
+| **Consolidation** | Price near BB middle, low volatility | Sideways movement, decreasing volume | Await breakout, no position |
+| **Breakout Pending** | BB contracting, volume increasing | Momentum building, RSI neutral | Prepare for directional move |
+
+## SIGNAL CONFLUENCE SCORING SYSTEM
+
+### Primary Signals (Weight: 25 points each)
+- **Multi-Timeframe Trend Alignment**: 4h and 1h trends in same direction
+- **Volume Confirmation**: Above-average volume supporting price direction
+- **Market Regime Consistency**: Both timeframes show same regime type
+
+### Secondary Signals (Weight: 15 points each)
+- **Fibonacci Confluence**: Price at key Fib levels (38.2%, 50%, 61.8%)
+- **Support/Resistance Reaction**: Price respecting key S/R levels
+- **Momentum Alignment**: RSI and MACD trends supporting direction
+
+### Tertiary Signals (Weight: 10 points each)
+- **Bollinger Band Position**: Price relative to BB bands
+- **EMA Alignment**: Price position relative to EMAs
+- **Candlestick Patterns**: Reversal/continuation patterns at key levels
+
+**Scoring Thresholds:**
+- 85-100 points: High Confidence (85-95%)
+- 70-84 points: Medium Confidence (75-84%)
+- Below 70 points: No Trade (conflicting signals)
+
+## VOLUME ANALYSIS FRAMEWORK
+
+### Volume Trend Classification:
+- **Significantly Above Average** (>150% avg): Strong institutional interest
+- **Above Average** (120-150% avg): Moderate institutional interest  
+- **Average** (80-120% avg): Normal retail activity
+- **Below Average** (<80% avg): Low conviction, potential false signals
+
+### Volume-Price Confirmation Matrix:
+| Price Action | Volume | Signal Strength | Interpretation |
+|-------------|--------|-----------------|----------------|
+| Rising | Above Average | Strong Bullish | High confidence long |
+| Rising | Below Average | Weak Bullish | Low confidence, potential reversal |
+| Falling | Above Average | Strong Bearish | High confidence short |
+| Falling | Below Average | Weak Bearish | Low confidence, potential bounce |
+
+## RISK MANAGEMENT MATRIX
+
+### Position Sizing Based on Confidence:
+- **High Confidence (85-95%)**: 2-3% account risk
+- **Medium Confidence (75-84%)**: 1-2% account risk
+- **Low Confidence (<75%)**: No position
+
+### Stop Loss Placement Hierarchy:
+1. **Primary**: Below/above key Fibonacci levels
+2. **Secondary**: Below/above major support/resistance
+3. **Tertiary**: Beyond recent swing high/low
+4. **Emergency**: 2-3% from entry (absolute maximum)
+
+### Target Selection Framework:
+1. **Conservative**: Next Fibonacci extension level
+2. **Moderate**: 2:1 risk-reward minimum
+3. **Aggressive**: Major resistance/support flip level
 
 DATA:
 {
@@ -504,83 +589,113 @@ DATA:
         `{"O": ${c.open.toFixed(5)}, "H": ${c.high.toFixed(5)}, "L": ${c.low.toFixed(5)}, "C": ${c.close.toFixed(5)}, "V": ${c.volume.toFixed(0)}}`
       ).join(', ')}]
     },
-    "MARKET CONDITIONS": {
-      "24h Volume": ${market.volume24h.toFixed(0)},
-      "Volume Trend": "${market.volumeTrend}",
-      "Average Volume": ${market.averageVolume.toFixed(0)},
+    "BITCOIN CONTEXT": {
+      "BTCUSDT Price": ${btcContext.price.toFixed(2)},
+      "BTC Dominance": ${btcContext.dominance.toFixed(1)},
+      "BTC 24h Volume": ${btcContext.volume24h.toFixed(0)},
+      "BTC Recent Candles 1h (OHLCV)": [${btcContext.recentCandles1h.slice(-3).map(c => 
+        `{"O": ${c.open.toFixed(2)}, "H": ${c.high.toFixed(2)}, "L": ${c.low.toFixed(2)}, "C": ${c.close.toFixed(2)}, "V": ${c.volume.toFixed(0)}}`
+      ).join(', ')}],
+      "BTC Recent Candles 4h (OHLCV)": [${btcContext.recentCandles4h.slice(-3).map(c => 
+        `{"O": ${c.open.toFixed(2)}, "H": ${c.high.toFixed(2)}, "L": ${c.low.toFixed(2)}, "C": ${c.close.toFixed(2)}, "V": ${c.volume.toFixed(0)}}`
+      ).join(', ')}],
+      "BTC Data Timestamp": "${btcContext.dataTimestamp}"
+    },
       "Funding Rate": ${market.fundingRate.toFixed(3)}
     }
 }
 
-INSTRUCTIONS FOR ANALYSIS:
+## FinCoT-TA SYSTEMATIC ANALYSIS PROCESS
 
-**<thinking>**
-**Expert Analytical Process:** Apply a systematic, top-down multi-timeframe analysis, prioritizing capital preservation.
+### STEP 1: MARKET REGIME CLASSIFICATION
+**Objective**: Establish the dominant market structure using the Market Regime Classification Matrix.
 
-**Step 1: Establish Primary Trend (4-Hour Timeframe - Highest Priority):**
- - Analyze the 4-hour Market Regime, EMA trend, MACD trend, and recent OHLCV to determine the dominant market direction (bullish, bearish, or ranging).
- - Identify major 4-hour support and resistance levels. This timeframe provides the foundational context; all subsequent lower timeframe analysis MUST align with this primary trend for a high-confidence trade idea.
- - Consider 4-hour Fibonacci levels as critical price zones. Price reactions at key Fibonacci retracement levels (38.2%, 50%, 61.8%) or extension levels can provide high-probability entry/exit points.
- - *Self-assessment:* Is the 4-hour trend direction clear and unambiguous? If not, note the ambiguity as a potential reason for a 'No Trade Idea'.
+**Analysis Process:**
+1. **4-Hour Regime Identification**: Classify using EMA alignment, MACD position, RSI range, and Bollinger Band state
+2. **1-Hour Regime Confirmation**: Verify alignment or identify conflicts with 4-hour regime
+3. **Regime Consistency Score**: Award 25 points if regimes align, 0 if conflicting
 
-**Step 2: Confirm Momentum and Setup (1-Hour Timeframe - Secondary Priority):**
- - Analyze the 1-hour Market Regime, EMA trend, MACD, and RSI. Crucially, assess if these indicators and their trends *align* with the established 4-hour trend. Strong alignment across timeframes is paramount for high confidence.
- - Identify key 1-hour support and resistance levels. Observe price action (OHLCV) reacting to or approaching these levels.
- - Examine 1-hour Fibonacci levels for precise entry timing. Look for confluence between Fibonacci levels and other support/resistance zones.
- - Evaluate 1-hour RSI trend (rising/falling) and its position relative to overbought (70) and oversold (30) thresholds. A rising RSI from below 30 is a stronger bullish signal than a rising RSI above 70, which may indicate overextension and potential reversal.
- - Analyze 1-hour MACD for bullish/bearish crossovers and the histogram's trend (increasing/decreasing momentum). Confirm if it is reinforcing momentum in the direction of the 4-hour trend.
- - Interpret Bollinger Bands: Are they expanding (increasing volatility) or contracting (decreasing volatility)? Is price breaking out or consolidating within the bands?
- - *Self-assessment:* Do 1-hour signals strongly confirm the 4-hour trend, or are there conflicts? If conflicts exist, prioritize the 4-hour trend. If the conflict is significant and persistent, this may lead to a 'No Trade Idea'.
+### STEP 2: MULTI-TIMEFRAME SIGNAL ANALYSIS
+**Objective**: Analyze technical signals across both timeframes using the Signal Confluence Scoring System.
 
-**Step 3: Candlestick and Volume Confirmation (Both Timeframes):**
- - Examine recent OHLCV data for significant candlestick patterns (e.g., Bullish Engulfing, Hammer, Shooting Star, Bearish Engulfing) specifically at identified key support/resistance levels. Interpret their implications in the context of the established multi-timeframe trend.
- - Analyze the 24h Volume and Volume Trend. Significantly *above average volume* (e.g., 84000 vs 50000) *confirming* price movements (e.g., rising price on rising volume for long setups, falling price on rising volume for short setups) adds the highest confidence to the trade idea. Below average volume or volume divergence from price action indicates lower confidence or potential false signals.
- - *Self-assessment:* Does volume unequivocally confirm price action and the trend? Are identified candlestick patterns strong and positioned at relevant price levels?
+**Primary Signal Analysis (25 points each):**
+1. **Trend Alignment**: Compare EMA trends, MACD directions, and RSI trends across timeframes
+2. **Volume Confirmation**: Apply Volume Analysis Framework to recent price action
+3. **Market Regime Consistency**: Verify both timeframes support same directional bias
 
-**Step 4: Confluence Assessment and Explicit Signal Weighting:**
- - Systematically weigh the strength of each aligned signal. Assign the *highest importance* to Multi-Timeframe Trend Alignment (4h and 1h in same direction) and Volume Confirmation.
- - Assign *very high importance* to Market Regime alignment across timeframes and Fibonacci level confluences with support/resistance.
- - Assign *medium importance* to strong momentum indicator alignment (RSI trend, MACD crossover/histogram) and price action at key support/resistance levels.
- - Assign *lower importance* to individual candlestick patterns unless they occur at critical support/resistance with strong volume.
- - Pay special attention to Fibonacci retracement levels during trending markets and extension levels during breakout scenarios.
- - Identify the strongest technical setup by assessing the overall confluence of aligned, weighted signals. A setup with 3-5 strongly confirming indicators is generally more successful.
- - *Self-assessment:* Is there overwhelming, weighted evidence for a clear directional bias? Or are signals mixed, ambiguous, or lacking sufficient confluence?
+**Secondary Signal Analysis (15 points each):**
+1. **Fibonacci Confluence**: Identify current price position relative to key Fib levels
+2. **Support/Resistance Reaction**: Analyze recent price behavior at identified S/R levels
+3. **Momentum Alignment**: Evaluate RSI positioning and MACD histogram trends
 
-**Step 5: Risk Management and Decision Formulation:**
- - Based on the strongest setup and its confluence, determine the optimal entry price. Consider current market structure and recent price action (e.g., a pullback to a key EMA or established support/resistance level).
- - Use Fibonacci levels as precise entry and exit points. For example, enter long positions at 61.8% retracement in uptrends, or target extension levels for profit-taking.
- - Precisely place the stop-loss using multiple support/resistance levels to ensure robust risk management and minimize potential losses.
- - Calculate the Risk-Reward Ratio. If the calculated ratio is less than 2:1, the trade idea is considered invalid for a high-confidence setup. In such cases, state 'No Trade Idea'.
- - *Self-assessment:* Is the proposed trade idea robust from a risk management perspective? Does it meet the minimum 2:1 risk-reward ratio? Is capital preservation prioritized?
+**Tertiary Signal Analysis (10 points each):**
+1. **Bollinger Band Position**: Current price relative to BB bands and band expansion/contraction
+2. **EMA Alignment**: Price position relative to EMA20 and EMA50
+3. **Candlestick Patterns**: Recent patterns at key technical levels
 
-**Step 6: Final Confidence Calibration and Trade Idea Decision:**
- - **If** 4h and 1h timeframes align, AND there is strong confluence of 3+ weighted signals, AND the risk-reward is >= 2:1, **THEN** provide a high-confidence trade idea (75-95%). The confidence score should directly reflect the strength of confluence and alignment.
- - **ELSE IF** timeframes conflict, OR indicators are mixed/ambiguous, OR risk-reward is < 2:1, **THEN** state 'No Trade Idea' and provide detailed explanation for abstention due to lack of a high-probability setup or unfavorable risk. In such cases, the 'confidence' field should be explicitly stated as 'N/A' or below 75%.
- - Formulate 5-6 specific technical reasons in the 'technicalReasoning' array. Prioritize the most impactful and aligned signals, justifying the chosen trade direction and the assigned confidence level.
-**</thinking>**
+### STEP 3: SIGNAL CONFLUENCE SCORING
+**Objective**: Calculate total confluence score and determine trade viability.
 
-IMPORTANT NOTES:
-- Use TREND analysis (rising/falling RSI, MACD trend, Bollinger expansion/contraction) with full contextual awareness.
- Use MARKET REGIME analysis as the primary context, then apply TREND analysis (rising/falling RSI, MACD trend, Bollinger expansion/contraction) with full contextual awareness.
- Prioritize FIBONACCI CONFLUENCES - when multiple Fibonacci levels align with support/resistance or when price is reacting at key Fibonacci zones.
-- Consider VOLUME CONFIRMATION (significantly above average volume on trending moves = higher confidence) as a critical validation.
-- Focus on RECENT PRICE ACTION from candlestick data, especially reactions at support/resistance.
- Focus on RECENT PRICE ACTION from candlestick data, especially reactions at support/resistance and Fibonacci levels.
-- Ensure risk-reward ratio is at least 2:1 for all high-confidence trades.
-- Maintain HIGH PRECISION for all prices (up to 5 decimal places for accuracy).
- Use Fibonacci levels for precise entry/exit targeting and risk management.
+**Scoring Process:**
+1. **Sum All Signal Scores**: Add primary (25pts), secondary (15pts), and tertiary (10pts) signals
+2. **Apply Confidence Mapping**: Use scoring thresholds to determine confidence level
+3. **Validate Minimum Threshold**: Require ≥70 points for any trade consideration
 
-**<output>**
-Respond ONLY with a valid JSON object in this exact format:
-{ "direction": "long" | "short" | "no_trade_due_to_conflict", "entry": 119000.5 | 0.031871 | 0.0, "stopLoss": 117500.25 | 0.031 | 0.0, "riskReward": 3.0 | 0.0, "confidence": 85 | "N/A", "technicalReasoning": [ "reason1", "reason2",... ], "timeframe": "6-24 hours" }
+### STEP 4: RISK-REWARD ASSESSMENT
+**Objective**: Apply Risk Management Matrix for position sizing and stop placement.
 
-- Ensure all prices are realistic numbers with appropriate precision based on the asset's price level (preserve natural precision from market data).
-- If 'direction' is 'no_trade_due_to_conflict', set 'entry', 'stopLoss', and 'riskReward' to 0.0, and 'confidence' to 'N/A' or below 75%, with 'technicalReasoning' explaining the lack of a clear setup or conflicting signals.
-- 'confidence' must be between 75-95 for high-quality setups. 'riskReward' is a decimal (e.g., 3.0).
-- 'technicalReasoning' must contain 5-6 items, explicitly focusing on multi-timeframe analysis, trend alignment, momentum, and volume confirmation, ordered by their impact on the decision.
-- Keep each 'technicalReasoning' item under 120 characters to fit Discord message limits.
- 'technicalReasoning' must contain 5-6 items, explicitly focusing on market regime alignment, multi-timeframe analysis, Fibonacci confluences, trend alignment, momentum, and volume confirmation, ordered by their impact on the decision.
-**</output>**`;
+**Risk Assessment Process:**
+1. **Entry Point Selection**: Use highest confluence technical level
+2. **Stop Loss Placement**: Apply Stop Loss Placement Hierarchy
+3. **Target Selection**: Use Target Selection Framework based on confidence level
+4. **Risk-Reward Calculation**: Ensure minimum 2:1 ratio for trade validity
+
+### STEP 5: STRUCTURED DECISION OUTPUT
+**Objective**: Generate systematic trade recommendation using FinCoT-TA conclusions.
+
+**Decision Logic:**
+- **IF** Total Score ≥85: High confidence trade (85-95% confidence)
+- **ELSE IF** Total Score 70-84: Medium confidence trade (75-84% confidence)  
+- **ELSE IF** Total Score <70: No trade due to insufficient confluence
+- **AND** Risk-Reward must be ≥2:1 for any trade recommendation
+
+## REQUIRED OUTPUT FORMAT
+
+Respond with ONLY a valid JSON object in this exact format:
+
+\`\`\`json
+{
+  "direction": "long" | "short" | "no_trade_due_to_conflict",
+  "entry": 111500.50,
+  "stopLoss": 110000.25,
+  "targetPrice": 115000.75,
+  "riskReward": 2.5,
+  "confidence": 85,
+  "confluenceScore": 87,
+  "technicalReasoning": [
+    "FinCoT-TA Step 1: Market regime analysis shows [specific finding]",
+    "FinCoT-TA Step 2: Multi-timeframe alignment indicates [specific finding]", 
+    "FinCoT-TA Step 2.5: Bitcoin correlation analysis shows [BTC influence assessment]",
+    "FinCoT-TA Step 3: Signal confluence score of [X] points confirms [direction]",
+    "FinCoT-TA Step 4: Risk-reward ratio of [X]:1 meets minimum threshold",
+    "FinCoT-TA Step 5: Volume analysis shows [specific confirmation]",
+    "Key confluence: Price at [specific Fibonacci/S&R level] with [supporting factors]"
+  ],
+  "timeframe": "6-24 hours",
+  "riskLevel": "medium",
+  "marketRegime4h": "ranging_volatile",
+  "marketRegime1h": "ranging_volatile",
+  "volumeConfirmation": "above_average"
+}
+\`\`\`
+
+**Critical Requirements:**
+- All prices must be realistic numbers with appropriate precision
+- Confidence must be 75-95 for valid trades, or 0 for no_trade_due_to_conflict
+- ConfluenceScore must reflect actual signal scoring calculation
+- TechnicalReasoning must reference specific FinCoT-TA steps and findings
+- Risk-reward ratio must be ≥2:1 for any trade recommendation
+- If no trade, set entry/stopLoss/targetPrice to 0.0 and confidence to 0`;
 }
 
 function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivativesMarketData): DerivativesTradeIdea | null {

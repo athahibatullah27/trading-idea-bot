@@ -64,4 +64,9 @@ export const commands = [
         .setDescription('Derivatives symbol (e.g., BTCUSDT, ETHUSDT)')
         .setRequired(true)
     )
+    ,
+  
+  new SlashCommandBuilder()
+    .setName('promptcheck')
+    .setDescription('Log the complete FinCoT-TA prompt and Gemini response to console for debugging')
 ];

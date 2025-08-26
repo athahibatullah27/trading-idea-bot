@@ -11,7 +11,7 @@ on:
   #     - master # Trigger on pull requests targeting 'main'
   push:
     branches:
-      - supabase-integration # Trigger on pushes to the 'supabase-integration' branch
+      - prompt-enhancement # Trigger on pushes to the 'insert-branch-name' branch
 
 # Define one or more jobs
 jobs:

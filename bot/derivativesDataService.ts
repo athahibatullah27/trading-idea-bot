@@ -3,7 +3,7 @@ import {
   TechnicalIndicators, 
   TimeframeData, 
   EnhancedDerivativesMarketData,
-  FibonacciLevels, 
+  FibonacciLevels,
   CandlestickData
 } from './types.js';
 import { 
@@ -624,10 +624,11 @@ export async function getEnhancedDerivativesMarketData(symbol: string, context?:
   try {
     log('INFO', `Fetching enhanced multi-timeframe market data for ${symbol}...`);
     
-    // Fetch candlestick data for both timeframes
-    const [candlesticks4h, candlesticks1h] = await Promise.all([
+    // Fetch candlestick data for both timeframes and BTC context
+    const [candlesticks4h, candlesticks1h, btcContext] = await Promise.all([
       fetchCandlestickData(symbol, '4h', 100, context),
-      fetchCandlestickData(symbol, '1h', 200, context) // More data for better volume analysis
+      fetchCandlestickData(symbol, '1h', 200, context), // More data for better volume analysis
+      getBTCContextData(context)
     ]);
     
     // Calculate technical indicators for both timeframes
@@ -665,6 +666,25 @@ export async function getEnhancedDerivativesMarketData(symbol: string, context?:
       averageVolume: indicators1h.averageVolume
     };
     
+    // Prepare BTC context data
+    const btcRecentOHLCV1h = btcContext.candles1h.slice(-5).map(c => ({
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+      volume: c.volume,
+      timestamp: c.openTime
+    }));
+    
+    const btcRecentOHLCV4h = btcContext.candles4h.slice(-5).map(c => ({
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+      volume: c.volume,
+      timestamp: c.openTime
+    }));
+    
     const enhancedData: EnhancedDerivativesMarketData = {
       symbol,
       dataTimestamp: new Date().toISOString(),
@@ -688,7 +708,15 @@ export async function getEnhancedDerivativesMarketData(symbol: string, context?:
           indicators: indicators1h
         }
       },
-      market: marketInfo
+      market: marketInfo,
+      btcContext: {
+        price: btcContext.price,
+        dominance: btcContext.dominance,
+        volume24h: btcContext.volume24h,
+        recentCandles1h: btcRecentOHLCV1h,
+        recentCandles4h: btcRecentOHLCV4h,
+        dataTimestamp: btcContext.dataTimestamp
+      }
     };
     
     log('INFO', `Successfully calculated enhanced multi-timeframe analysis for ${symbol}:`);
@@ -696,13 +724,15 @@ export async function getEnhancedDerivativesMarketData(symbol: string, context?:
     log('INFO', `1h: Price $${indicators1h.currentPrice.toLocaleString()}, RSI ${indicators1h.rsi.toFixed(1)} (${indicators1h.rsiTrend})`);
     log('INFO', `Market Regimes - 4h: ${marketRegime4h}, 1h: ${marketRegime1h}`);
     log('INFO', `Volume: ${indicators1h.volumeTrend}`);
+    log('INFO', `BTC Context: $${btcContext.price.toLocaleString()}, Dominance ${btcContext.dominance.toFixed(1)}%`);
     
     logFunctionExit('getEnhancedDerivativesMarketData', { 
       symbol, 
       price4h: indicators4h.currentPrice, 
       price1h: indicators1h.currentPrice,
       regime4h: marketRegime4h,
-      regime1h: marketRegime1h
+      regime1h: marketRegime1h,
+      btcPrice: btcContext.price
     });
     endPerformanceTimer(timerId);
     return enhancedData;
@@ -772,5 +802,216 @@ export async function testBinanceFuturesAPI(): Promise<boolean> {
     logFunctionExit('testBinanceFuturesAPI', false);
     endPerformanceTimer(timerId);
     return false;
+  }
+}
+
+// Bitcoin context cache
+interface BTCContextCache {
+  price: number;
+  dominance: number;
+  volume24h: number;
+  candles1h: CandlestickData[];
+  candles4h: CandlestickData[];
+  dataTimestamp: string;
+  lastUpdate1h: number;
+  lastUpdate4h: number;
+}
+
+let btcContextCache: BTCContextCache | null = null;
+
+// Function to check if we need to update BTC cache
+function shouldUpdateBTCCache(): { update1h: boolean; update4h: boolean } {
+  const now = new Date();
+  const currentHour = now.getUTCHours();
+  const currentMinute = now.getUTCMinutes();
+  const currentTimestamp = now.getTime();
+  
+  if (!btcContextCache) {
+    return { update1h: true, update4h: true };
+  }
+  
+  // Check if we need 1-hour update (every hour at minute 0, or if >1 hour old)
+  const hoursSinceLastUpdate1h = (currentTimestamp - btcContextCache.lastUpdate1h) / (1000 * 60 * 60);
+  const update1h = hoursSinceLastUpdate1h >= 1 || (currentMinute === 0 && hoursSinceLastUpdate1h > 0.5);
+  
+  // Check if we need 4-hour update (every 4 hours: 00:00, 04:00, 08:00, 12:00, 16:00, 20:00)
+  const hoursSinceLastUpdate4h = (currentTimestamp - btcContextCache.lastUpdate4h) / (1000 * 60 * 60);
+  const is4HourMark = currentHour % 4 === 0;
+  const update4h = hoursSinceLastUpdate4h >= 4 || (is4HourMark && currentMinute === 0 && hoursSinceLastUpdate4h > 2);
+  
+  return { update1h, update4h };
+}
+
+// Function to get Bitcoin context data with caching
+export async function getBTCContextData(context?: string): Promise<{
+  price: number;
+  dominance: number;
+  volume24h: number;
+  candles1h: CandlestickData[];
+  candles4h: CandlestickData[];
+  dataTimestamp: string;
+}> {
+  const timerId = startPerformanceTimer('getBTCContextData');
+  logFunctionEntry('getBTCContextData');
+  
+  try {
+    const { update1h, update4h } = shouldUpdateBTCCache();
+    
+    log('INFO', `BTC Cache Status: 1h update needed: ${update1h}, 4h update needed: ${update4h}`);
+    
+    // If we have fresh cache and don't need updates, return cached data
+    if (btcContextCache && !update1h && !update4h) {
+      log('INFO', 'Using cached BTC context data');
+      logFunctionExit('getBTCContextData', { cached: true });
+      endPerformanceTimer(timerId);
+      return {
+        price: btcContextCache.price,
+        dominance: btcContextCache.dominance,
+        volume24h: btcContextCache.volume24h,
+        candles1h: btcContextCache.candles1h,
+        candles4h: btcContextCache.candles4h,
+        dataTimestamp: btcContextCache.dataTimestamp
+      };
+    }
+    
+    // Fetch new data as needed
+    const promises: Promise<any>[] = [];
+    
+    if (update1h) {
+      promises.push(fetchCandlestickData('BTCUSDT', '1h', 5, context));
+    }
+    
+    if (update4h) {
+      promises.push(fetchCandlestickData('BTCUSDT', '4h', 5, context));
+    }
+    
+    // Always fetch current price and market data (lightweight)
+    promises.push(fetchBTCMarketData(context));
+    
+    const results = await Promise.all(promises);
+    
+    let newCandles1h = btcContextCache?.candles1h || [];
+    let newCandles4h = btcContextCache?.candles4h || [];
+    let resultIndex = 0;
+    
+    if (update1h) {
+      newCandles1h = results[resultIndex++];
+    }
+    
+    if (update4h) {
+      newCandles4h = results[resultIndex++];
+    }
+    
+    const marketData = results[resultIndex];
+    
+    // Update cache
+    const currentTimestamp = Date.now();
+    btcContextCache = {
+      price: marketData.price,
+      dominance: marketData.dominance,
+      volume24h: marketData.volume24h,
+      candles1h: newCandles1h,
+      candles4h: newCandles4h,
+      dataTimestamp: new Date().toISOString(),
+      lastUpdate1h: update1h ? currentTimestamp : (btcContextCache?.lastUpdate1h || currentTimestamp),
+      lastUpdate4h: update4h ? currentTimestamp : (btcContextCache?.lastUpdate4h || currentTimestamp)
+    };
+    
+    log('INFO', `BTC cache updated: Price $${marketData.price.toLocaleString()}, Dominance ${marketData.dominance.toFixed(1)}%, Volume $${(marketData.volume24h / 1e9).toFixed(1)}B`);
+    
+    logFunctionExit('getBTCContextData', { 
+      price: marketData.price, 
+      updated1h: update1h, 
+      updated4h: update4h 
+    });
+    endPerformanceTimer(timerId);
+    
+    return {
+      price: btcContextCache.price,
+      dominance: btcContextCache.dominance,
+      volume24h: btcContextCache.volume24h,
+      candles1h: btcContextCache.candles1h,
+      candles4h: btcContextCache.candles4h,
+      dataTimestamp: btcContextCache.dataTimestamp
+    };
+    
+  } catch (error) {
+    log('ERROR', 'Error fetching BTC context data', error.message);
+    
+    // Return stale cache if available, otherwise throw
+    if (btcContextCache) {
+      log('WARN', 'Using stale BTC cache due to API error');
+      logFunctionExit('getBTCContextData', { stale: true });
+      endPerformanceTimer(timerId);
+      return {
+        price: btcContextCache.price,
+        dominance: btcContextCache.dominance,
+        volume24h: btcContextCache.volume24h,
+        candles1h: btcContextCache.candles1h,
+        candles4h: btcContextCache.candles4h,
+        dataTimestamp: btcContextCache.dataTimestamp
+      };
+    }
+    
+    logFunctionExit('getBTCContextData', null);
+    endPerformanceTimer(timerId);
+    throw error;
+  }
+}
+
+// Function to fetch BTC market data (price, dominance, volume)
+async function fetchBTCMarketData(context?: string): Promise<{
+  price: number;
+  dominance: number;
+  volume24h: number;
+}> {
+  const timerId = startPerformanceTimer('fetchBTCMarketData');
+  logFunctionEntry('fetchBTCMarketData');
+  
+  try {
+    // Fetch BTC price from Binance
+    const priceUrl = `${BINANCE_FUTURES_API_BASE}/fapi/v1/ticker/24hr?symbol=BTCUSDT`;
+    
+    logApiRequest({
+      endpoint: priceUrl,
+      method: 'GET',
+      headers: {
+        'User-Agent': 'CryptoTrader-Bot/1.0'
+      },
+      context
+    });
+    
+    const priceResponse = await axios.get(priceUrl, {
+      timeout: 8000,
+      headers: {
+        'User-Agent': 'CryptoTrader-Bot/1.0'
+      }
+    });
+    
+    logApiResponse({
+      status: priceResponse.status,
+      statusText: priceResponse.statusText,
+      data: priceResponse.data,
+      context
+    });
+    
+    const price = parseFloat(priceResponse.data.lastPrice);
+    const volume24h = parseFloat(priceResponse.data.quoteVolume);
+    
+    // Mock dominance data (in production, you'd fetch from CoinGecko or similar)
+    const dominance = 48.2 + (Math.random() - 0.5) * 2; // Mock between 47.2-49.2%
+    
+    log('INFO', `BTC market data: Price $${price.toLocaleString()}, Volume $${(volume24h / 1e9).toFixed(1)}B, Dominance ${dominance.toFixed(1)}%`);
+    
+    logFunctionExit('fetchBTCMarketData', { price, dominance, volume24h });
+    endPerformanceTimer(timerId);
+    
+    return { price, dominance, volume24h };
+    
+  } catch (error) {
+    log('ERROR', 'Error fetching BTC market data', error.message);
+    logFunctionExit('fetchBTCMarketData', null);
+    endPerformanceTimer(timerId);
+    throw error;
   }
 }
