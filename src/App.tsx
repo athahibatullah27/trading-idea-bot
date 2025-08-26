@@ -14,7 +14,7 @@ function App() {
     refreshData
   } = useRealTimeData();
   
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'accurate' | 'inaccurate' | 'expired'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'accurate' | 'inaccurate' | 'expired' | 'no_entry_hit'>('all');
   
   const filteredRecommendations = recommendations.filter(rec => {
     if (statusFilter === 'all') return true;
@@ -72,6 +72,7 @@ function App() {
                 <option value="accurate">Accurate</option>
                 <option value="inaccurate">Inaccurate</option>
                 <option value="expired">Expired</option>
+                <option value="no_entry_hit">No Entry Hit</option>
               </select>
             </div>
           </div>

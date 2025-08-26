@@ -13,6 +13,7 @@ interface UseRealTimeDataReturn {
     accurate: number;
     inaccurate: number;
     expired: number;
+    noEntryHit: number;
     accuracyRate: number;
   };
   isLoading: boolean;
@@ -30,6 +31,7 @@ export function useRealTimeData(): UseRealTimeDataReturn {
     accurate: 0,
     inaccurate: 0,
     expired: 0,
+    noEntryHit: 0,
     accuracyRate: 0
   });
 

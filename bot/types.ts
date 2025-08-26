@@ -25,7 +25,7 @@ export interface TradingRecommendation {
   reasoning: string[];
   timeframe: string;
   riskLevel: 'low' | 'medium' | 'high';
-  status?: 'pending' | 'accurate' | 'inaccurate' | 'expired';
+  status?: 'pending' | 'accurate' | 'inaccurate' | 'expired' | 'no_entry_hit';
   entryPrice?: number;
   evaluationTimestamp?: string;
   createdAt?: string;

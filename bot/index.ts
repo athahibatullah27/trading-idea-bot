@@ -210,7 +210,8 @@ app.get('/api/gemini-recommendations', async (req, res) => {
     for (const recommendation of recommendations) {
       const cryptoData = await getRealTimeCryptoData(recommendation.crypto, 'gemini recommendations');
       const entryPrice = cryptoData?.price || recommendation.targetPrice;
-      await storeTradeRecommendation(recommendation, entryPrice);
+      const currentPrice = cryptoData?.price || recommendation.targetPrice;
+      await storeTradeRecommendation(recommendation, entryPrice, currentPrice);
     }
     
     log('INFO', `Successfully generated ${recommendations.length} Gemini recommendations`);
@@ -1213,7 +1214,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
             }
             
             // Store in Supabase with entry price
-            const stored = await storeTradeRecommendation(mappedRecommendation, tradeIdea.entry);
+            const currentPrice = marketData.timeframes['1h'].indicators.currentPrice;
+            const stored = await storeTradeRecommendation(mappedRecommendation, tradeIdea.entry, currentPrice);
             
           } catch (storeError) {
             log('ERROR', 'Error storing derivatives trade idea', storeError);
