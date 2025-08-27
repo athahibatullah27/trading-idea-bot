@@ -16,7 +16,7 @@ dotenv.config();
 
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
 export interface DerivativesTradeIdea {
   direction: 'long' | 'short';
@@ -74,7 +74,7 @@ export async function generateGeminiRecommendations(
         'Authorization': '[REDACTED]'
       },
       body: {
-        model: 'gemini-2.5-flash',
+        model: 'gemini-2.0-flash-exp',
         promptLength: prompt.length,
         cryptoSymbols: cryptoData.map(c => c.symbol)
       },
@@ -364,7 +364,7 @@ export async function generateDerivativesTradeIdea(
         'Authorization': '[REDACTED]'
       },
       body: {
-        model: 'gemini-2.5-flash',
+        model: 'gemini-2.0-flash-exp',
         promptLength: prompt.length,
         symbol: marketData.symbol,
         timeframes: Object.keys(marketData.timeframes)
