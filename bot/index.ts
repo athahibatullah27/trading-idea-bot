@@ -189,6 +189,24 @@ app.get('/api/gemini-recommendations', async (req, res) => {
       'gemini recommendations'
     );
     
+    // Check if we got a quota exceeded error
+    if (recommendations.length === 1 && recommendations[0].crypto === 'QUOTA_EXCEEDED') {
+      const quotaEmbed = new EmbedBuilder()
+        .setColor('#FF6B6B')
+        .setTitle('🚫 API Quota Exceeded')
+        .setDescription('The Gemini AI API has reached its daily quota limit.')
+        .addFields(
+          { name: '📊 Current Limit', value: '50 requests per day (Free Tier)', inline: true },
+          { name: '🔄 Reset Time', value: 'Daily at midnight UTC', inline: true },
+          { name: '💡 Solutions', value: '• Wait for quota reset\n• Upgrade to paid plan\n• Use other commands like `/crypto` or `/market`', inline: false }
+        )
+        .setFooter({ text: 'Visit ai.google.dev for more information about rate limits' })
+        .setTimestamp();
+
+      // await interaction.editReply({ embeds: [quotaEmbed] });
+      return;
+    }
+    
     if (recommendations.length === 0) {
       logApiResponse({ 
         status: 503, 
@@ -803,6 +821,25 @@ client.on(Events.InteractionCreate, async (interaction) => {
           return;
         }
         
+        // Check if this is a quota exceeded response
+        if (recommendations.length === 1 && recommendations[0].crypto === 'QUOTA_EXCEEDED') {
+          const quotaEmbed = new EmbedBuilder()
+            .setColor('#FF6B6B')
+            .setTitle('🚫 Gemini API Quota Exceeded')
+            .setDescription('The AI service has reached its daily request limit.')
+            .addFields(
+              { name: '📊 Current Limit', value: '50 requests per day (Free Tier)', inline: true },
+              { name: '🔄 Reset Time', value: 'Daily at 12:00 AM UTC', inline: true },
+              { name: '⏰ Try Again', value: 'In a few hours or tomorrow', inline: true },
+              { name: '💡 Alternative', value: 'Use `/market`, `/crypto [symbol]`, or `/price [symbol]` for market data without AI analysis', inline: false }
+            )
+            .setFooter({ text: 'Consider upgrading to Gemini Pro for higher limits' })
+            .setTimestamp();
+
+          await interaction.editReply({ embeds: [quotaEmbed] });
+          return;
+        }
+        
         // Update with success message
         logDiscordInteraction('EDIT_REPLY', { 
           commandName: interaction.commandName, 
@@ -1160,6 +1197,25 @@ client.on(Events.InteractionCreate, async (interaction) => {
         // Generate trade idea using Gemini
         log('INFO', `Generating AI trade idea for ${finalSymbol}...`);
         const tradeIdea = await generateDerivativesTradeIdea(marketData, 'derivativetrade command');
+        
+        // Check if we got a quota exceeded error
+        if (tradeIdea && tradeIdea.symbol === 'QUOTA_EXCEEDED') {
+          const quotaEmbed = new EmbedBuilder()
+            .setColor('#FF6B6B')
+            .setTitle('🚫 Gemini API Quota Exceeded')
+            .setDescription('The AI analysis service has reached its daily request limit.')
+            .addFields(
+              { name: '📊 Daily Limit', value: '50 AI requests (Free Tier)', inline: true },
+              { name: '🔄 Resets', value: 'Daily at midnight UTC', inline: true },
+              { name: '💡 What you can do', value: '• Try again tomorrow\n• Use `/crypto` for basic analysis\n• Upgrade to paid Gemini plan', inline: false },
+              { name: '🔗 More Info', value: '[Gemini API Rate Limits](https://ai.google.dev/gemini-api/docs/rate-limits)', inline: false }
+            )
+            .setFooter({ text: `Requested by ${interaction.user.username}` })
+            .setTimestamp();
+
+          await interaction.editReply({ embeds: [quotaEmbed] });
+          return;
+        }
         
         if (!tradeIdea) {
           // Additional check before processing
@@ -1769,112 +1825,10 @@ client.on(Events.MessageCreate, async (message) => {
       return;
     }
 
-    // Quick price command
-    if (content.includes('!price')) {
-      const priceMatch = content.match(/!price\s+(btc|eth|sol|ada|bnb|xrp)/i);
-      if (priceMatch) {
-        const symbol = priceMatch[1].toUpperCase();
-        const loadingMsg = await message.channel.send(`💰 **Getting ${symbol} price...**`);
-        
-        try {
-          const crypto = await getRealTimeCryptoData(symbol);
-          if (crypto && crypto.price > 0) {
-            const changeEmoji = crypto.change24h > 0 ? '📈' : '📉';
-            const changeColor = crypto.change24h > 0 ? '🟢' : '🔴';
-            
-            await loadingMsg.edit(
-              `💰 **${crypto.name} (${symbol})**\n` +
-              `**Price:** $${crypto.price.toLocaleString()}\n` +
-              `**24h Change:** ${changeColor} ${crypto.change24h > 0 ? '+' : ''}${crypto.change24h.toFixed(2)}% ${changeEmoji}`
-            );
-          } else {
-            throw new Error('No price data available');
-          }
-        } catch (error) {
-          await loadingMsg.edit(`❌ **Could not fetch ${symbol} price. Please try again later.**`);
-        }
-      } else {
-        await message.channel.send('💡 **Usage:** `!price btc` or `!price eth` etc.');
-      }
-      return;
-    }
-
-    // Crypto analysis command (e.g., !btc, !eth, !sol) - This block was moved above
-    const cryptoMatch2 = content.match(/!(btc|eth|sol|ada)/);
-    if (cryptoMatch2) {
-      const symbol = cryptoMatch2[1].toUpperCase();
-      
-      await message.channel.send(`💡 **Please use the slash command instead:** \`/crypto ${symbol.toLowerCase()}\` for better performance and real-time data.`);
-      return;
-    }
-
-    // News command
-    if (content.includes('!news') || content.includes('crypto news')) {
-      const loadingMsg = await message.channel.send('📰 **Fetching latest crypto news...**');
-      
-      try {
-        // Fetch real-time news from CryptoCompare
-        const realTimeNews = await fetchCoinDeskNews(5); // Limit to 5 articles for Discord embed
-        
-        if (realTimeNews.length > 0) {
-          await loadingMsg.edit(`✅ **Found ${realTimeNews.length} latest crypto news articles!**`);
-          const newsEmbed = createNewsEmbed(realTimeNews);
-          await message.channel.send({ embeds: [newsEmbed] });
-        } else {
-          await loadingMsg.edit('⚠️ **News service temporarily unavailable. Please try again later.**');
-        }
-      } catch (error) {
-        console.error('Error fetching real-time news for !news command:', error);
-        await loadingMsg.edit('⚠️ **News service temporarily unavailable. Please try again later.**');
-      }
-      return;
-    }
-
-    // Help command
-    if (content.includes('!help') || content.includes('help')) {
-      const helpEmbed = new EmbedBuilder()
-        .setColor(0x3b82f6)
-        .setTitle('🤖 CryptoTrader Bot Commands')
-        .setDescription('Available commands for crypto trading analysis')
-        .addFields(
-          { name: '!tradingidea', value: 'Get AI-powered trading recommendations', inline: false },
-          { name: '!market', value: 'View current market overview', inline: false },
-          { name: '!btc, !eth, !sol, !ada', value: 'Get technical analysis for specific crypto', inline: false },
-          { name: '!price [symbol]', value: 'Get quick price for any crypto', inline: false },
-          { name: '!news', value: 'Latest crypto news with sentiment analysis', inline: false },
-          { name: '!test', value: 'Test API connectivity', inline: false },
-          { name: '!help', value: 'Show this help message', inline: false }
-        )
-        .setTimestamp()
-        .setFooter({ text: 'CryptoTrader Bot • AI-Powered Trading Analysis' });
-
-      await message.channel.send({ embeds: [helpEmbed] });
-      return;
-    }
-
   } catch (error) {
     console.error('Error handling message:', error);
-    await message.channel.send('❌ Sorry, I encountered an error processing your request. Please try again.');
   }
 });
 
-// Error handling
-client.on(Events.Error, (error) => {
-  logAppState('ERROR', { message: 'Discord client error', error });
-});
-
-process.on('unhandledRejection', (error) => {
-  logAppState('ERROR', { message: 'Unhandled promise rejection', error });
-});
-
 // Login to Discord
-const token = process.env.DISCORD_BOT_TOKEN;
-if (!token) {
-  logAppState('ERROR', { message: 'DISCORD_BOT_TOKEN is not set in .env file' });
-  process.exit(1);
-}
-
-client.login(token).catch((error) => {
-  logAppState('ERROR', { message: 'Failed to login to Discord', error });
-  process.exit(1);
-});
+client.login(process.env.DISCORD_BOT_TOKEN);

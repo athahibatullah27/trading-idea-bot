@@ -114,6 +114,22 @@ export async function generateGeminiRecommendations(
   } catch (error) {
     log('ERROR', 'Error generating Gemini recommendations', error.message);
     
+    // Check if this is a quota/rate limit error
+    if (error.message && error.message.includes('429 Too Many Requests')) {
+      log('WARN', 'Gemini API quota exceeded - returning quota error indicator');
+      // Return a special error indicator that the calling code can detect
+      return [{ 
+        crypto: 'QUOTA_EXCEEDED', 
+        action: 'hold' as const,
+        confidence: 0,
+        targetPrice: 0,
+        stopLoss: 0,
+        reasoning: ['Gemini API quota exceeded. Please try again later or upgrade your plan.'],
+        timeframe: 'N/A',
+        riskLevel: 'low' as const
+      }];
+    }
+    
     logApiResponse({
       status: 500,
       error: error.message,
@@ -417,6 +433,27 @@ export async function generateDerivativesTradeIdea(
     
   } catch (error) {
     log('ERROR', 'Error generating derivatives trade idea', error.message);
+    
+    // Check if this is a quota/rate limit error
+    if (error.message && error.message.includes('429 Too Many Requests')) {
+      log('WARN', 'Gemini API quota exceeded for derivatives trade');
+      // Return a special error indicator
+      return {
+        direction: 'long' as const,
+        entry: 0,
+        targetPrice: 0,
+        stopLoss: 0,
+        riskReward: 0,
+        confidence: 0,
+        technicalReasoning: [
+          'Gemini API quota exceeded. You have reached the daily limit of 50 requests.',
+          'Please try again tomorrow or upgrade to a paid plan for higher limits.',
+          'Visit https://ai.google.dev/gemini-api/docs/rate-limits for more information.'
+        ],
+        symbol: 'QUOTA_EXCEEDED',
+        timeframe: 'Please try again later'
+      };
+    }
     
     logApiResponse({
       status: 500,
