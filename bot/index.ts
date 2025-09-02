@@ -1734,9 +1734,9 @@ function createDerivativesTradeEmbed(tradeIdea: DerivativesTradeIdea, marketData
     // Add trade details for valid trades
     embed.addFields(
       { name: '📊 Direction', value: tradeIdea.direction.toUpperCase(), inline: true },
-      { name: '🎯 Entry Price', value: `$${tradeIdea.entry.toLocaleString()}`, inline: true },
-      { name: '🎯 Target Price', value: `$${tradeIdea.targetPrice.toLocaleString()}`, inline: true },
-      { name: '🛡️ Stop Loss', value: `$${tradeIdea.stopLoss.toLocaleString()}`, inline: true },
+      { name: '🎯 Entry Price', value: `$${tradeIdea.entry.toFixed(6)}`, inline: true },
+      { name: '🏆 Target Price', value: `$${tradeIdea.targetPrice.toFixed(6)}`, inline: true },
+      { name: '🛡️ Stop Loss', value: `$${tradeIdea.stopLoss.toFixed(6)}`, inline: true },
       { name: '📈 Risk/Reward', value: `${tradeIdea.riskReward}:1`, inline: true },
       { name: '🎲 Confidence', value: `${tradeIdea.confidence}%`, inline: true },
       { name: '⏰ Timeframe', value: tradeIdea.timeframe, inline: true }
