@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient.js';
 import { fetchCandlestickData } from './derivativesDataService.js';
 import { TradingRecommendation } from './types.js';
+import { SignalAnalysisResult, analyzeReasoningForSignals } from './utils/signalAnalysis.js';
 import { 
   logDatabaseOperation, 
   logDatabaseError, 
@@ -22,29 +23,21 @@ export interface StoredTradeRecommendation extends TradingRecommendation {
 // Function to store a trade recommendation in Supabase
 export async function storeTradeRecommendation(
   recommendation: TradingRecommendation,
-  entryPrice: number,
-  currentPrice: number
+  entryPrice: number
 ): Promise<boolean> {
   const timerId = startPerformanceTimer('storeTradeRecommendation');
   logFunctionEntry('storeTradeRecommendation', { 
     crypto: recommendation.crypto, 
     action: recommendation.action,
-    entryPrice,
-    currentPrice
+    entryPrice
   });
   
   try {
     log('INFO', `Storing trade recommendation for ${recommendation.crypto}...`);
     
-    // Determine initial status based on entry price vs current price
-    let initialStatus: 'pending' | 'no_entry_hit';
-    if (Math.abs(entryPrice - currentPrice) < 0.01) { // Allow small floating point differences
-      initialStatus = 'pending';
-      log('INFO', `${recommendation.crypto}: Entry price ${entryPrice} matches current price ${currentPrice}, setting status to 'pending'`);
-    } else {
-      initialStatus = 'no_entry_hit';
-      log('INFO', `${recommendation.crypto}: Entry price ${entryPrice} differs from current price ${currentPrice}, setting status to 'no_entry_hit'`);
-    }
+    // Set initial status to pending for new recommendations
+    const initialStatus = 'pending';
+    log('INFO', `${recommendation.crypto}: Setting initial status to 'pending'`);
     
     // Analyze reasoning for signal activation
     const signalAnalysis: SignalAnalysisResult = analyzeReasoningForSignals(recommendation.reasoning);
