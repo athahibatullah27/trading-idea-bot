@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart3, Target, XCircle, Clock, Archive, TrendingUp } from 'lucide-react';
+import { BarChart3, Target, XCircle, Clock, Archive, TrendingUp, Ban } from 'lucide-react';
 
 interface EvaluationStatsProps {
   stats: {
@@ -8,6 +8,7 @@ interface EvaluationStatsProps {
     accurate: number;
     inaccurate: number;
     expired: number;
+    noEntryHit: number;
     accuracyRate: number;
   };
 }
@@ -59,6 +60,13 @@ export function EvaluationStats({ stats }: EvaluationStatsProps) {
 
         <div className="bg-gray-900/50 rounded-lg p-4">
           <div className="flex items-center space-x-2 mb-2">
+            <Ban className="w-4 h-4 text-orange-400" />
+            <span className="text-gray-400 text-sm">No Entry Hit</span>
+          </div>
+          <p className="text-orange-400 font-bold text-xl">{stats.noEntryHit}</p>
+        </div>
+        <div className="bg-gray-900/50 rounded-lg p-4">
+          <div className="flex items-center space-x-2 mb-2">
             <Archive className="w-4 h-4 text-gray-400" />
             <span className="text-gray-400 text-sm">Expired</span>
           </div>
@@ -108,6 +116,12 @@ export function EvaluationStats({ stats }: EvaluationStatsProps) {
                 <div 
                   className="bg-yellow-400" 
                   style={{ width: `${(stats.pending / stats.total) * 100}%` }}
+                ></div>
+              )}
+              {stats.noEntryHit > 0 && (
+                <div 
+                  className="bg-orange-400" 
+                  style={{ width: `${(stats.noEntryHit / stats.total) * 100}%` }}
                 ></div>
               )}
               {stats.expired > 0 && (

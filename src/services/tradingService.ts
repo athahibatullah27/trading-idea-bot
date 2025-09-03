@@ -35,19 +35,19 @@ export async function getEvaluatedRecommendationsFromAPI(): Promise<TradingRecom
     
     console.log(`✅ Frontend: Successfully received ${recommendations.length} evaluated recommendations`);
     console.log(`📊 Frontend: Recommendation statuses:`, {
-      pending: recommendations.filter(r => r.status === 'pending').length,
-      accurate: recommendations.filter(r => r.status === 'accurate').length,
-      inaccurate: recommendations.filter(r => r.status === 'inaccurate').length,
-      expired: recommendations.filter(r => r.status === 'expired').length
+      pending: recommendations.filter((r: TradingRecommendation) => r.status === 'pending').length,
+      accurate: recommendations.filter((r: TradingRecommendation) => r.status === 'accurate').length,
+      inaccurate: recommendations.filter((r: TradingRecommendation) => r.status === 'inaccurate').length,
+      expired: recommendations.filter((r: TradingRecommendation) => r.status === 'expired').length
     });
     
     return recommendations;
 
   } catch (error) {
-    console.error('❌ Frontend: Error fetching evaluated recommendations via proxy:', error.message);
+    console.error('❌ Frontend: Error fetching evaluated recommendations via proxy:', (error as Error).message);
     console.error('🔍 Frontend: Evaluated recommendations error details:', {
-      errorType: error.constructor.name,
-      message: error.message,
+      errorType: (error as Error).constructor.name,
+      message: (error as Error).message,
       proxyUrl: `${API_PROXY_BASE}/evaluated-recommendations`
     });
     
@@ -63,6 +63,7 @@ export async function getEvaluationStatsFromAPI(): Promise<{
   accurate: number;
   inaccurate: number;
   expired: number;
+  noEntryHit: number;
   accuracyRate: number;
 }> {
   try {
@@ -89,7 +90,7 @@ export async function getEvaluationStatsFromAPI(): Promise<{
     return stats;
 
   } catch (error) {
-    console.error('❌ Frontend: Error fetching evaluation statistics:', error.message);
-    return { total: 0, pending: 0, accurate: 0, inaccurate: 0, expired: 0, accuracyRate: 0 };
+    console.error('❌ Frontend: Error fetching evaluation statistics:', (error as Error).message);
+    return { total: 0, pending: 0, accurate: 0, inaccurate: 0, expired: 0, noEntryHit: 0, accuracyRate: 0 };
   }
 }

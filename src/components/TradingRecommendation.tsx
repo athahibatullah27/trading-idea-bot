@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, TrendingDown, Minus, Target, Shield, Clock, AlertTriangle, CheckCircle, XCircle, Timer, Archive } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Target, Shield, Clock, AlertTriangle, CheckCircle, XCircle, Timer, Archive, Ban } from 'lucide-react';
 import { TradingRecommendation as TradingRecommendationType } from '../types/trading';
 
 interface TradingRecommendationProps {
@@ -54,6 +54,8 @@ export function TradingRecommendation({ recommendation }: TradingRecommendationP
         return <XCircle className="w-5 h-5 text-red-400" />;
       case 'expired':
         return <Archive className="w-5 h-5 text-gray-400" />;
+      case 'no_entry_hit':
+        return <Ban className="w-5 h-5 text-orange-400" />;
       default:
         return <Timer className="w-5 h-5 text-yellow-400" />;
     }
@@ -67,6 +69,8 @@ export function TradingRecommendation({ recommendation }: TradingRecommendationP
         return 'text-red-400 bg-red-400/10 border-red-400/20';
       case 'expired':
         return 'text-gray-400 bg-gray-400/10 border-gray-400/20';
+      case 'no_entry_hit':
+        return 'text-orange-400 bg-orange-400/10 border-orange-400/20';
       default:
         return 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20';
     }
@@ -80,6 +84,8 @@ export function TradingRecommendation({ recommendation }: TradingRecommendationP
         return 'Stop Loss Hit';
       case 'expired':
         return 'Expired';
+      case 'no_entry_hit':
+        return 'No Entry Hit';
       default:
         return 'Pending';
     }
@@ -99,6 +105,7 @@ export function TradingRecommendation({ recommendation }: TradingRecommendationP
       recommendation.status === 'accurate' ? 'border-green-500/50 hover:border-green-500' :
       recommendation.status === 'inaccurate' ? 'border-red-500/50 hover:border-red-500' :
       recommendation.status === 'expired' ? 'border-gray-500/50 hover:border-gray-500' :
+      recommendation.status === 'no_entry_hit' ? 'border-orange-500/50 hover:border-orange-500' :
       'border-gray-700 hover:border-blue-500/50'
     }`}>
       <div className="flex items-center justify-between mb-4">
@@ -136,7 +143,7 @@ export function TradingRecommendation({ recommendation }: TradingRecommendationP
             <span className="text-gray-400 text-sm">Target</span>
           </div>
           <p className="text-green-400 font-semibold">
-            ${recommendation.targetPrice.toLocaleString()}
+            ${recommendation.targetPrice.toFixed(6)}
           </p>
         </div>
 
@@ -146,7 +153,7 @@ export function TradingRecommendation({ recommendation }: TradingRecommendationP
             <span className="text-gray-400 text-sm">Stop Loss</span>
           </div>
           <p className="text-red-400 font-semibold">
-            ${recommendation.stopLoss.toLocaleString()}
+            ${recommendation.stopLoss.toFixed(6)}
           </p>
         </div>
       </div>
@@ -156,7 +163,7 @@ export function TradingRecommendation({ recommendation }: TradingRecommendationP
           <div className="flex items-center justify-between">
             <div>
               <span className="text-gray-400 text-sm">Entry Price</span>
-              <p className="text-white font-semibold">${recommendation.entryPrice.toLocaleString()}</p>
+              <p className="text-white font-semibold">${recommendation.entryPrice.toFixed(6)}</p>
             </div>
             <div className="text-right">
               <span className="text-gray-400 text-sm">Created</span>

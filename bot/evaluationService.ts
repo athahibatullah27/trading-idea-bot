@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient.js';
-import { getRealTimeCryptoData } from './tradingview.js';
+import { fetchCandlestickData } from './derivativesDataService.js';
 import { TradingRecommendation } from './types.js';
 import { 
   logDatabaseOperation, 
@@ -14,7 +14,7 @@ import {
 export interface StoredTradeRecommendation extends TradingRecommendation {
   id: string;
   entry_price?: number;
-  status: 'pending' | 'accurate' | 'inaccurate' | 'expired';
+  status: 'pending' | 'accurate' | 'inaccurate' | 'expired' | 'no_entry_hit';
   evaluation_timestamp?: string;
   created_at: string;
 }
@@ -22,17 +22,29 @@ export interface StoredTradeRecommendation extends TradingRecommendation {
 // Function to store a trade recommendation in Supabase
 export async function storeTradeRecommendation(
   recommendation: TradingRecommendation,
-  entryPrice: number
+  entryPrice: number,
+  currentPrice: number
 ): Promise<boolean> {
   const timerId = startPerformanceTimer('storeTradeRecommendation');
   logFunctionEntry('storeTradeRecommendation', { 
     crypto: recommendation.crypto, 
     action: recommendation.action,
-    entryPrice 
+    entryPrice,
+    currentPrice
   });
   
   try {
     log('INFO', `Storing trade recommendation for ${recommendation.crypto}...`);
+    
+    // Determine initial status based on entry price vs current price
+    let initialStatus: 'pending' | 'no_entry_hit';
+    if (Math.abs(entryPrice - currentPrice) < 0.01) { // Allow small floating point differences
+      initialStatus = 'pending';
+      log('INFO', `${recommendation.crypto}: Entry price ${entryPrice} matches current price ${currentPrice}, setting status to 'pending'`);
+    } else {
+      initialStatus = 'no_entry_hit';
+      log('INFO', `${recommendation.crypto}: Entry price ${entryPrice} differs from current price ${currentPrice}, setting status to 'no_entry_hit'`);
+    }
     
     const insertData = {
       symbol: recommendation.crypto,
@@ -44,7 +56,7 @@ export async function storeTradeRecommendation(
       timeframe: recommendation.timeframe,
       risk_level: recommendation.riskLevel,
       entry_price: entryPrice,
-      status: 'pending'
+      status: initialStatus
     };
     
     logDatabaseOperation({
@@ -70,7 +82,7 @@ export async function storeTradeRecommendation(
       affectedRows: 1
     });
     
-    log('INFO', `Successfully stored trade recommendation for ${recommendation.crypto}`);
+    log('INFO', `Successfully stored trade recommendation for ${recommendation.crypto} with initial status: ${initialStatus}`);
     logFunctionExit('storeTradeRecommendation', true);
     endPerformanceTimer(timerId);
     return true;
@@ -153,23 +165,25 @@ async function evaluateSingleRecommendation(recommendation: any): Promise<void> 
   try {
     log('INFO', `Evaluating ${recommendation.symbol} ${recommendation.action} recommendation...`);
     
-    // Get current price
-    const currentData = await getRealTimeCryptoData(recommendation.symbol);
-    if (!currentData || currentData.price <= 0) {
-      log('WARN', `Could not fetch current price for ${recommendation.symbol}, skipping evaluation`);
+    // Get latest 4-hour OHLCV candle
+    const candlesticks = await fetchCandlestickData(recommendation.symbol, '4h', 1, 'evaluation');
+    if (!candlesticks || candlesticks.length === 0) {
+      log('WARN', `Could not fetch 4-hour candle data for ${recommendation.symbol}, skipping evaluation`);
       logFunctionExit('evaluateSingleRecommendation');
       endPerformanceTimer(timerId);
       return;
     }
 
-    const currentPrice = currentData.price;
+    const latestCandle = candlesticks[0];
+    const { open, high, low, close } = latestCandle;
     const targetPrice = parseFloat(recommendation.target_price);
     const stopLoss = parseFloat(recommendation.stop_loss);
     const entryPrice = parseFloat(recommendation.entry_price || recommendation.target_price);
 
-    log('INFO', `${recommendation.symbol}: Current $${currentPrice.toLocaleString()}, Target $${targetPrice.toLocaleString()}, Stop $${stopLoss.toLocaleString()}`);
+    log('INFO', `${recommendation.symbol}: 4h Candle OHLC $${open.toFixed(2)}/$${high.toFixed(2)}/$${low.toFixed(2)}/$${close.toFixed(2)}, Entry $${entryPrice.toLocaleString()}, Target $${targetPrice.toLocaleString()}, Stop $${stopLoss.toLocaleString()}`);
 
     let newStatus: 'accurate' | 'inaccurate' | 'expired' | null = null;
+    let currentEvaluationStatus = recommendation.status;
     let evaluationReason = '';
 
     // Check if recommendation has expired (older than 30 days)
@@ -179,43 +193,95 @@ async function evaluateSingleRecommendation(recommendation: any): Promise<void> 
     if (daysSinceCreated > 30) {
       newStatus = 'expired';
       evaluationReason = 'Recommendation expired after 30 days';
+      log('INFO', `${recommendation.symbol} recommendation expired after ${daysSinceCreated.toFixed(1)} days`);
     } else {
-      // Evaluate based on action type
-      switch (recommendation.action.toLowerCase()) {
-        case 'buy':
-          if (currentPrice >= targetPrice) {
-            newStatus = 'accurate';
-            evaluationReason = `Target price reached: $${currentPrice.toLocaleString()} >= $${targetPrice.toLocaleString()}`;
-          } else if (currentPrice <= stopLoss) {
-            newStatus = 'inaccurate';
-            evaluationReason = `Stop loss hit: $${currentPrice.toLocaleString()} <= $${stopLoss.toLocaleString()}`;
-          }
-          break;
-
-        case 'sell':
-          if (currentPrice <= targetPrice) {
-            newStatus = 'accurate';
-            evaluationReason = `Target price reached: $${currentPrice.toLocaleString()} <= $${targetPrice.toLocaleString()}`;
-          } else if (currentPrice >= stopLoss) {
-            newStatus = 'inaccurate';
-            evaluationReason = `Stop loss hit: $${currentPrice.toLocaleString()} >= $${stopLoss.toLocaleString()}`;
-          }
-          break;
-
-        case 'hold':
-          // For hold recommendations, we'll consider them accurate if price stays within a reasonable range
-          const priceChangePercent = ((currentPrice - entryPrice) / entryPrice) * 100;
-          if (Math.abs(priceChangePercent) <= 10) {
-            // Price stayed within 10% range - consider accurate for hold
-            if (daysSinceCreated >= 7) { // Only evaluate hold after at least a week
-              newStatus = 'accurate';
-              evaluationReason = `Hold recommendation successful: price stayed within 10% range (${priceChangePercent.toFixed(2)}%)`;
+      // Step 1: Handle 'no_entry_hit' status - check if entry condition is now met
+      if (currentEvaluationStatus === 'no_entry_hit') {
+        // Check if entry price is within the 4-hour candle range
+        const entryInRange = entryPrice >= low && entryPrice <= high;
+        
+        if (!entryInRange) {
+          // Entry price still not reached, status remains 'no_entry_hit'
+          log('INFO', `${recommendation.symbol}: Entry still not hit - entry price $${entryPrice.toLocaleString()} not in 4h range $${low.toFixed(2)} - $${high.toFixed(2)}`);
+          logFunctionExit('evaluateSingleRecommendation');
+          endPerformanceTimer(timerId);
+          return;
+        } else {
+          // Entry price is within range, transition to 'pending' and continue evaluation
+          currentEvaluationStatus = 'pending';
+          log('INFO', `${recommendation.symbol}: Entry price reached, transitioning from 'no_entry_hit' to 'pending'`);
+        }
+      }
+      
+      // Step 2: Handle 'pending' status - evaluate target/stop loss
+      if (currentEvaluationStatus === 'pending') {
+        let targetHit = false;
+        let stopLossHit = false;
+        
+        switch (recommendation.action.toLowerCase()) {
+          case 'buy':
+            // For buy: target hit if high >= target, stop loss hit if low <= stop
+            targetHit = high >= targetPrice;
+            stopLossHit = low <= stopLoss;
+            break;
+            
+          case 'sell':
+            // For sell: target hit if low <= target, stop loss hit if high >= stop
+            targetHit = low <= targetPrice;
+            stopLossHit = high >= stopLoss;
+            break;
+            
+          case 'hold':
+            // For hold recommendations, use existing logic with current close price
+            const priceChangePercent = ((close - entryPrice) / entryPrice) * 100;
+            if (Math.abs(priceChangePercent) <= 10) {
+              // Price stayed within 10% range - consider accurate for hold
+              if (daysSinceCreated >= 7) { // Only evaluate hold after at least a week
+                targetHit = true;
+                evaluationReason = `Hold recommendation successful: price stayed within 10% range (${priceChangePercent.toFixed(2)}%)`;
+              }
+            } else if (low <= stopLoss) {
+              stopLossHit = true;
             }
-          } else if (currentPrice <= stopLoss) {
-            newStatus = 'inaccurate';
-            evaluationReason = `Stop loss hit: $${currentPrice.toLocaleString()} <= $${stopLoss.toLocaleString()}`;
+            break;
+        }
+        
+        // Determine final status based on hits
+        if (targetHit) {
+          newStatus = 'accurate';
+          if (!evaluationReason) {
+            evaluationReason = recommendation.action === 'buy' 
+              ? `Target hit: 4h high $${high.toFixed(2)} >= target $${targetPrice.toLocaleString()}`
+              : `Target hit: 4h low $${low.toFixed(2)} <= target $${targetPrice.toLocaleString()}`;
           }
-          break;
+          log('INFO', `${recommendation.symbol}: Target achieved - ${evaluationReason}`);
+        } else if (stopLossHit) {
+          newStatus = 'inaccurate';
+          evaluationReason = recommendation.action === 'buy'
+            ? `Stop loss hit: 4h low $${low.toFixed(2)} <= stop $${stopLoss.toLocaleString()}`
+            : `Stop loss hit: 4h high $${high.toFixed(2)} >= stop $${stopLoss.toLocaleString()}`;
+          log('INFO', `${recommendation.symbol}: Stop loss triggered - ${evaluationReason}`);
+        } else {
+          // Neither target nor stop loss hit
+          if (recommendation.status === 'no_entry_hit') {
+            // Need to update status from 'no_entry_hit' to 'pending'
+            newStatus = 'pending' as any;
+            evaluationReason = `Entry confirmed at $${entryPrice.toLocaleString()}, awaiting target/stop loss`;
+            log('INFO', `${recommendation.symbol}: Entry confirmed, now pending target/stop evaluation`);
+          } else {
+            // Already pending, no status change needed
+            log('INFO', `${recommendation.symbol}: Still pending - neither target nor stop loss hit in this 4h candle`);
+            logFunctionExit('evaluateSingleRecommendation');
+            endPerformanceTimer(timerId);
+            return;
+          }
+        }
+      } else {
+        // Status is already 'accurate', 'inaccurate', or 'expired', skip evaluation
+        log('INFO', `${recommendation.symbol}: Skipping evaluation - status is already ${currentEvaluationStatus}`);
+        logFunctionExit('evaluateSingleRecommendation');
+        endPerformanceTimer(timerId);
+        return;
       }
     }
 
@@ -248,8 +314,6 @@ async function evaluateSingleRecommendation(recommendation: any): Promise<void> 
         });
         log('INFO', `${recommendation.symbol} recommendation marked as ${newStatus}: ${evaluationReason}`);
       }
-    } else {
-      log('INFO', `${recommendation.symbol} recommendation still pending evaluation`);
     }
 
     logFunctionExit('evaluateSingleRecommendation', { status: newStatus || 'pending' });
@@ -268,6 +332,7 @@ export async function getEvaluationStats(): Promise<{
   accurate: number;
   inaccurate: number;
   expired: number;
+  noEntryHit: number;
   accuracyRate: number;
 }> {
   const timerId = startPerformanceTimer('getEvaluationStats');
@@ -286,9 +351,9 @@ export async function getEvaluationStats(): Promise<{
 
     if (error) {
       logDatabaseError('SELECT', 'trade_recommendations', error);
-      logFunctionExit('getEvaluationStats', { total: 0, pending: 0, accurate: 0, inaccurate: 0, expired: 0, accuracyRate: 0 });
+      logFunctionExit('getEvaluationStats', { total: 0, pending: 0, accurate: 0, inaccurate: 0, expired: 0, noEntryHit: 0, accuracyRate: 0 });
       endPerformanceTimer(timerId);
-      return { total: 0, pending: 0, accurate: 0, inaccurate: 0, expired: 0, accuracyRate: 0 };
+      return { total: 0, pending: 0, accurate: 0, inaccurate: 0, expired: 0, noEntryHit: 0, accuracyRate: 0 };
     }
 
     logDatabaseOperation({
@@ -303,6 +368,7 @@ export async function getEvaluationStats(): Promise<{
       accurate: data.filter(r => r.status === 'accurate').length,
       inaccurate: data.filter(r => r.status === 'inaccurate').length,
       expired: data.filter(r => r.status === 'expired').length,
+      noEntryHit: data.filter(r => r.status === 'no_entry_hit').length,
       accuracyRate: 0
     };
 
@@ -317,8 +383,8 @@ export async function getEvaluationStats(): Promise<{
     return stats;
   } catch (error) {
     log('ERROR', 'Error calculating evaluation stats', error);
-    logFunctionExit('getEvaluationStats', { total: 0, pending: 0, accurate: 0, inaccurate: 0, expired: 0, accuracyRate: 0 });
+    logFunctionExit('getEvaluationStats', { total: 0, pending: 0, accurate: 0, inaccurate: 0, expired: 0, noEntryHit: 0, accuracyRate: 0 });
     endPerformanceTimer(timerId);
-    return { total: 0, pending: 0, accurate: 0, inaccurate: 0, expired: 0, accuracyRate: 0 };
+    return { total: 0, pending: 0, accurate: 0, inaccurate: 0, expired: 0, noEntryHit: 0, accuracyRate: 0 };
   }
 }

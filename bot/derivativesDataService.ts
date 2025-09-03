@@ -624,22 +624,40 @@ export async function getEnhancedDerivativesMarketData(symbol: string, context?:
   try {
     log('INFO', `Fetching enhanced multi-timeframe market data for ${symbol}...`);
     
-    // Fetch candlestick data for both timeframes and BTC context
-    const [candlesticks4h, candlesticks1h, btcContext] = await Promise.all([
+    // Fetch candlestick data for all timeframes and BTC context
+    const [candlesticks1d, candlesticks4h, candlesticks1h, candlesticks30m, candlesticks15m, btcContext] = await Promise.all([
+      fetchCandlestickData(symbol, '1d', 30, context), // 30 days for daily analysis
       fetchCandlestickData(symbol, '4h', 100, context),
       fetchCandlestickData(symbol, '1h', 200, context), // More data for better volume analysis
+      fetchCandlestickData(symbol, '30m', 100, context), // 50 hours of 30m data
+      fetchCandlestickData(symbol, '15m', 100, context), // 25 hours of 15m data
       getBTCContextData(context)
     ]);
     
-    // Calculate technical indicators for both timeframes
+    // Calculate technical indicators for all timeframes
+    const indicators1d = calculateEnhancedTechnicalIndicators(candlesticks1d);
     const indicators4h = calculateEnhancedTechnicalIndicators(candlesticks4h);
     const indicators1h = calculateEnhancedTechnicalIndicators(candlesticks1h);
+    const indicators30m = calculateEnhancedTechnicalIndicators(candlesticks30m);
+    const indicators15m = calculateEnhancedTechnicalIndicators(candlesticks15m);
     
-    // Identify market regimes for both timeframes
+    // Identify market regimes for all timeframes
+    const marketRegime1d = identifyMarketRegime(indicators1d);
     const marketRegime4h = identifyMarketRegime(indicators4h);
     const marketRegime1h = identifyMarketRegime(indicators1h);
+    const marketRegime30m = identifyMarketRegime(indicators30m);
+    const marketRegime15m = identifyMarketRegime(indicators15m);
     
     // Prepare recent OHLCV data
+    const recentOHLCV1d = candlesticks1d.slice(-5).map(c => ({
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+      volume: c.volume,
+      timestamp: c.openTime
+    }));
+    
     const recentOHLCV4h = candlesticks4h.slice(-5).map(c => ({
       open: c.open,
       high: c.high,
@@ -650,6 +668,24 @@ export async function getEnhancedDerivativesMarketData(symbol: string, context?:
     }));
     
     const recentOHLCV1h = candlesticks1h.slice(-5).map(c => ({
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+      volume: c.volume,
+      timestamp: c.openTime
+    }));
+    
+    const recentOHLCV30m = candlesticks30m.slice(-5).map(c => ({
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+      volume: c.volume,
+      timestamp: c.openTime
+    }));
+    
+    const recentOHLCV15m = candlesticks15m.slice(-5).map(c => ({
       open: c.open,
       high: c.high,
       low: c.low,
@@ -689,6 +725,15 @@ export async function getEnhancedDerivativesMarketData(symbol: string, context?:
       symbol,
       dataTimestamp: new Date().toISOString(),
       timeframes: {
+        '1d': {
+          timeframe: '1d',
+          marketRegime: marketRegime1d,
+          price: {
+            currentPrice: indicators1d.currentPrice,
+            recentOHLCV: recentOHLCV1d
+          },
+          indicators: indicators1d
+        },
         '4h': {
           timeframe: '4h',
           marketRegime: marketRegime4h,
@@ -706,6 +751,24 @@ export async function getEnhancedDerivativesMarketData(symbol: string, context?:
             recentOHLCV: recentOHLCV1h
           },
           indicators: indicators1h
+        },
+        '30m': {
+          timeframe: '30m',
+          marketRegime: marketRegime30m,
+          price: {
+            currentPrice: indicators30m.currentPrice,
+            recentOHLCV: recentOHLCV30m
+          },
+          indicators: indicators30m
+        },
+        '15m': {
+          timeframe: '15m',
+          marketRegime: marketRegime15m,
+          price: {
+            currentPrice: indicators15m.currentPrice,
+            recentOHLCV: recentOHLCV15m
+          },
+          indicators: indicators15m
         }
       },
       market: marketInfo,
@@ -720,18 +783,27 @@ export async function getEnhancedDerivativesMarketData(symbol: string, context?:
     };
     
     log('INFO', `Successfully calculated enhanced multi-timeframe analysis for ${symbol}:`);
+    log('INFO', `1d: Price $${indicators1d.currentPrice.toLocaleString()}, RSI ${indicators1d.rsi.toFixed(1)} (${indicators1d.rsiTrend})`);
     log('INFO', `4h: Price $${indicators4h.currentPrice.toLocaleString()}, RSI ${indicators4h.rsi.toFixed(1)} (${indicators4h.rsiTrend})`);
     log('INFO', `1h: Price $${indicators1h.currentPrice.toLocaleString()}, RSI ${indicators1h.rsi.toFixed(1)} (${indicators1h.rsiTrend})`);
-    log('INFO', `Market Regimes - 4h: ${marketRegime4h}, 1h: ${marketRegime1h}`);
+    log('INFO', `30m: Price $${indicators30m.currentPrice.toLocaleString()}, RSI ${indicators30m.rsi.toFixed(1)} (${indicators30m.rsiTrend})`);
+    log('INFO', `15m: Price $${indicators15m.currentPrice.toLocaleString()}, RSI ${indicators15m.rsi.toFixed(1)} (${indicators15m.rsiTrend})`);
+    log('INFO', `Market Regimes - 1d: ${marketRegime1d}, 4h: ${marketRegime4h}, 1h: ${marketRegime1h}, 30m: ${marketRegime30m}, 15m: ${marketRegime15m}`);
     log('INFO', `Volume: ${indicators1h.volumeTrend}`);
     log('INFO', `BTC Context: $${btcContext.price.toLocaleString()}, Dominance ${btcContext.dominance.toFixed(1)}%`);
     
     logFunctionExit('getEnhancedDerivativesMarketData', { 
       symbol, 
+      price1d: indicators1d.currentPrice,
       price4h: indicators4h.currentPrice, 
       price1h: indicators1h.currentPrice,
+      price30m: indicators30m.currentPrice,
+      price15m: indicators15m.currentPrice,
+      regime1d: marketRegime1d,
       regime4h: marketRegime4h,
       regime1h: marketRegime1h,
+      regime30m: marketRegime30m,
+      regime15m: marketRegime15m,
       btcPrice: btcContext.price
     });
     endPerformanceTimer(timerId);
