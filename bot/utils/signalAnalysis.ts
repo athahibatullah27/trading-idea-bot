@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient.js';
 import { fetchCandlestickData } from './derivativesDataService.js';
 import { TradingRecommendation } from './types.js';
+import { SignalAnalysisResult, analyzeReasoningForSignals } from './utils/signalAnalysis.js';
 import { 
   logDatabaseOperation, 
   logDatabaseError, 

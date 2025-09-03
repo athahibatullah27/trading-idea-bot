@@ -5,6 +5,28 @@ const API_PROXY_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:30
 
 console.log('🌐 Frontend: Using API base URL:', API_PROXY_BASE);
 
+// Interface for signal usage statistics
+export interface SignalUsageStats {
+  // Primary Signals
+  multiTimeframeTrendAlignment: number;
+  volumeConfirmation: number;
+  marketRegimeConsistency: number;
+  
+  // Secondary Signals
+  fibonacciConfluence: number;
+  supportResistanceReaction: number;
+  momentumAlignment: number;
+  
+  // Tertiary Signals
+  bollingerBandPosition: number;
+  emaAlignment: number;
+  candlestickPatterns: number;
+  
+  // Metadata
+  totalRecommendations: number;
+  averageConfluenceScore: number;
+}
+
 // Core functions for trade recommendation evaluation system
 
 // Function to get evaluated recommendations from API
@@ -35,19 +57,19 @@ export async function getEvaluatedRecommendationsFromAPI(): Promise<TradingRecom
     
     console.log(`✅ Frontend: Successfully received ${recommendations.length} evaluated recommendations`);
     console.log(`📊 Frontend: Recommendation statuses:`, {
-      pending: recommendations.filter(r => r.status === 'pending').length,
-      accurate: recommendations.filter(r => r.status === 'accurate').length,
-      inaccurate: recommendations.filter(r => r.status === 'inaccurate').length,
-      expired: recommendations.filter(r => r.status === 'expired').length
+      pending: recommendations.filter((r: TradingRecommendation) => r.status === 'pending').length,
+      accurate: recommendations.filter((r: TradingRecommendation) => r.status === 'accurate').length,
+      inaccurate: recommendations.filter((r: TradingRecommendation) => r.status === 'inaccurate').length,
+      expired: recommendations.filter((r: TradingRecommendation) => r.status === 'expired').length
     });
     
     return recommendations;
 
   } catch (error) {
-    console.error('❌ Frontend: Error fetching evaluated recommendations via proxy:', error.message);
+    console.error('❌ Frontend: Error fetching evaluated recommendations via proxy:', (error as Error).message);
     console.error('🔍 Frontend: Evaluated recommendations error details:', {
-      errorType: error.constructor.name,
-      message: error.message,
+      errorType: (error as Error).constructor.name,
+      message: (error as Error).message,
       proxyUrl: `${API_PROXY_BASE}/evaluated-recommendations`
     });
     
@@ -63,6 +85,7 @@ export async function getEvaluationStatsFromAPI(): Promise<{
   accurate: number;
   inaccurate: number;
   expired: number;
+  noEntryHit: number;
   accuracyRate: number;
 }> {
   try {
@@ -89,7 +112,50 @@ export async function getEvaluationStatsFromAPI(): Promise<{
     return stats;
 
   } catch (error) {
-    console.error('❌ Frontend: Error fetching evaluation statistics:', error.message);
-    return { total: 0, pending: 0, accurate: 0, inaccurate: 0, expired: 0, accuracyRate: 0 };
+    console.error('❌ Frontend: Error fetching evaluation statistics:', (error as Error).message);
+    return { total: 0, pending: 0, accurate: 0, inaccurate: 0, expired: 0, noEntryHit: 0, accuracyRate: 0 };
+  }
+}
+
+// Function to get signal usage statistics from API
+export async function getSignalUsageStatsFromAPI(): Promise<SignalUsageStats> {
+  try {
+    console.log('📊 Frontend: Requesting signal usage statistics via proxy...');
+    
+    const response = await fetch(`${API_PROXY_BASE}/signal-usage`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      signal: AbortSignal.timeout(10000), // 10 second timeout
+      mode: 'cors', // Enable CORS
+      credentials: 'omit' // Don't send credentials
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} ${response.statusText}`);
+    }
+    
+    const stats = await response.json();
+    console.log(`✅ Frontend: Successfully received signal usage statistics:`, stats);
+    
+    return stats;
+
+  } catch (error) {
+    console.error('❌ Frontend: Error fetching signal usage statistics:', (error as Error).message);
+    return {
+      multiTimeframeTrendAlignment: 0,
+      volumeConfirmation: 0,
+      marketRegimeConsistency: 0,
+      fibonacciConfluence: 0,
+      supportResistanceReaction: 0,
+      momentumAlignment: 0,
+      bollingerBandPosition: 0,
+      emaAlignment: 0,
+      candlestickPatterns: 0,
+      totalRecommendations: 0,
+      averageConfluenceScore: 0
+    };
   }
 }

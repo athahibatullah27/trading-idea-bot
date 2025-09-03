@@ -25,7 +25,7 @@ export interface TradingRecommendation {
   reasoning: string[];
   timeframe: string;
   riskLevel: 'low' | 'medium' | 'high';
-  status?: 'pending' | 'accurate' | 'inaccurate' | 'expired';
+  status?: 'pending' | 'accurate' | 'inaccurate' | 'expired' | 'no_entry_hit';
   entryPrice?: number;
   evaluationTimestamp?: string;
   createdAt?: string;
@@ -134,8 +134,11 @@ export interface EnhancedDerivativesMarketData {
   symbol: string;
   dataTimestamp: string;
   timeframes: {
+    '1d': TimeframeData;
     '4h': TimeframeData;
     '1h': TimeframeData;
+    '30m': TimeframeData;
+    '15m': TimeframeData;
   };
   market: {
     fundingRate: number;
@@ -165,4 +168,17 @@ export interface EnhancedDerivativesMarketData {
     }>;
     dataTimestamp: string;
   };
+}
+
+export interface DerivativesTradeIdea {
+  direction: 'long' | 'short';
+  entry: number;
+  targetPrice: number;
+  stopLoss: number;
+  riskReward: number;
+  confidence: number;
+  technicalReasoning: string[];
+  symbol: string;
+  timeframe: string;
+  activatedSignals?: string[];
 }
