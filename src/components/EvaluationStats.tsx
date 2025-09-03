@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart3, Target, XCircle, Clock, Archive, TrendingUp } from 'lucide-react';
+import { BarChart3, Target, XCircle, Clock, Archive, TrendingUp, Ban } from 'lucide-react';
 
 interface EvaluationStatsProps {
   stats: {
@@ -8,6 +8,7 @@ interface EvaluationStatsProps {
     accurate: number;
     inaccurate: number;
     expired: number;
+    noEntryHit: number;
     accuracyRate: number;
   };
 }
@@ -26,59 +27,67 @@ export function EvaluationStats({ stats }: EvaluationStatsProps) {
   };
 
   return (
-    <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+    <div className="bg-gray-800 rounded-lg p-4 sm:p-6 border border-gray-700">
       <div className="flex items-center space-x-2 mb-6">
         <BarChart3 className="w-5 h-5 text-blue-400" />
-        <h3 className="text-white font-semibold">Recommendation Performance</h3>
+        <h3 className="text-white font-semibold text-base sm:text-lg">Recommendation Performance</h3>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6">
         <div className="bg-gray-900/50 rounded-lg p-4">
           <div className="flex items-center space-x-2 mb-2">
             <Target className="w-4 h-4 text-green-400" />
-            <span className="text-gray-400 text-sm">Accurate</span>
+            <span className="text-gray-400 text-xs sm:text-sm">Accurate</span>
           </div>
-          <p className="text-green-400 font-bold text-xl">{stats.accurate}</p>
+          <p className="text-green-400 font-bold text-lg sm:text-xl">{stats.accurate}</p>
         </div>
 
         <div className="bg-gray-900/50 rounded-lg p-4">
           <div className="flex items-center space-x-2 mb-2">
             <XCircle className="w-4 h-4 text-red-400" />
-            <span className="text-gray-400 text-sm">Inaccurate</span>
+            <span className="text-gray-400 text-xs sm:text-sm">Inaccurate</span>
           </div>
-          <p className="text-red-400 font-bold text-xl">{stats.inaccurate}</p>
+          <p className="text-red-400 font-bold text-lg sm:text-xl">{stats.inaccurate}</p>
         </div>
 
         <div className="bg-gray-900/50 rounded-lg p-4">
           <div className="flex items-center space-x-2 mb-2">
             <Clock className="w-4 h-4 text-yellow-400" />
-            <span className="text-gray-400 text-sm">Pending</span>
+            <span className="text-gray-400 text-xs sm:text-sm">Pending</span>
           </div>
-          <p className="text-yellow-400 font-bold text-xl">{stats.pending}</p>
+          <p className="text-yellow-400 font-bold text-lg sm:text-xl">{stats.pending}</p>
         </div>
 
         <div className="bg-gray-900/50 rounded-lg p-4">
           <div className="flex items-center space-x-2 mb-2">
-            <Archive className="w-4 h-4 text-gray-400" />
-            <span className="text-gray-400 text-sm">Expired</span>
+            <Ban className="w-4 h-4 text-orange-400" />
+            <span className="text-gray-400 text-xs sm:text-sm">No Entry</span>
           </div>
-          <p className="text-gray-400 font-bold text-xl">{stats.expired}</p>
+          <p className="text-orange-400 font-bold text-lg sm:text-xl">{stats.noEntryHit}</p>
+        </div>
+        
+        <div className="bg-gray-900/50 rounded-lg p-4">
+          <div className="flex items-center space-x-2 mb-2">
+            <Archive className="w-4 h-4 text-gray-400" />
+            <span className="text-gray-400 text-xs sm:text-sm">Expired</span>
+          </div>
+          <p className="text-gray-400 font-bold text-lg sm:text-xl">{stats.expired}</p>
         </div>
 
         <div className="bg-gray-900/50 rounded-lg p-4">
           <div className="flex items-center space-x-2 mb-2">
             <BarChart3 className="w-4 h-4 text-blue-400" />
-            <span className="text-gray-400 text-sm">Total</span>
+            <span className="text-gray-400 text-xs sm:text-sm">Total</span>
           </div>
-          <p className="text-blue-400 font-bold text-xl">{stats.total}</p>
+          <p className="text-blue-400 font-bold text-lg sm:text-xl">{stats.total}</p>
         </div>
 
         <div className={`rounded-lg p-4 ${getAccuracyBgColor()}`}>
           <div className="flex items-center space-x-2 mb-2">
             <TrendingUp className={`w-4 h-4 ${getAccuracyColor()}`} />
-            <span className="text-gray-400 text-sm">Accuracy Rate</span>
+            <span className="text-gray-400 text-xs sm:text-sm">Accuracy</span>
           </div>
-          <p className={`font-bold text-xl ${getAccuracyColor()}`}>
+          <p className={`font-bold text-lg sm:text-xl ${getAccuracyColor()}`}>
             {stats.accuracyRate.toFixed(1)}%
           </p>
         </div>
@@ -108,6 +117,12 @@ export function EvaluationStats({ stats }: EvaluationStatsProps) {
                 <div 
                   className="bg-yellow-400" 
                   style={{ width: `${(stats.pending / stats.total) * 100}%` }}
+                ></div>
+              )}
+              {stats.noEntryHit > 0 && (
+                <div 
+                  className="bg-orange-400" 
+                  style={{ width: `${(stats.noEntryHit / stats.total) * 100}%` }}
                 ></div>
               )}
               {stats.expired > 0 && (

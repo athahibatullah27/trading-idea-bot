@@ -103,14 +103,14 @@ export function PromptEvaluatorPage() {
   return (
     <div className="min-h-screen bg-gray-900">
       {/* Header */}
-      <div className="bg-gray-800 border-b border-gray-700 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+      <div className="bg-gray-800 border-b border-gray-700 px-4 sm:px-6 py-4">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center space-x-3">
             <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg">
               <BarChart3 className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white">Prompt Quality Evaluator</h1>
+              <h1 className="text-lg sm:text-xl font-bold text-white">Prompt Quality Evaluator</h1>
               <p className="text-sm text-gray-400">FinCoT-TA Signal Usage Analysis</p>
             </div>
           </div>
@@ -118,7 +118,7 @@ export function PromptEvaluatorPage() {
           <button 
             onClick={refreshData}
             disabled={isLoading}
-            className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg transition-colors"
+            className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg transition-colors text-sm sm:text-base"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
@@ -126,15 +126,15 @@ export function PromptEvaluatorPage() {
         </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Overview Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
             <div className="flex items-center space-x-2 mb-2">
               <Target className="w-5 h-5 text-blue-400" />
               <span className="text-gray-400">Total Recommendations</span>
             </div>
-            <p className="text-2xl font-bold text-white">{signalStats.totalRecommendations}</p>
+            <p className="text-xl sm:text-2xl font-bold text-white">{signalStats.totalRecommendations}</p>
           </div>
 
           <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
@@ -142,7 +142,7 @@ export function PromptEvaluatorPage() {
               <TrendingUp className="w-5 h-5 text-green-400" />
               <span className="text-gray-400">Avg Confluence Score</span>
             </div>
-            <p className="text-2xl font-bold text-white">{signalStats.averageConfluenceScore.toFixed(1)}</p>
+            <p className="text-xl sm:text-2xl font-bold text-white">{signalStats.averageConfluenceScore.toFixed(1)}</p>
           </div>
 
           <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
@@ -150,7 +150,7 @@ export function PromptEvaluatorPage() {
               <Activity className="w-5 h-5 text-purple-400" />
               <span className="text-gray-400">Most Used Signal</span>
             </div>
-            <p className="text-lg font-bold text-white">
+            <p className="text-sm sm:text-lg font-bold text-white">
               {maxCount > 0 ? 
                 Object.entries(signalStats)
                   .filter(([key]) => key !== 'totalRecommendations' && key !== 'averageConfluenceScore')
@@ -166,10 +166,10 @@ export function PromptEvaluatorPage() {
         {/* Signal Categories */}
         <div className="space-y-8">
           {signalDefinitions.map((category) => (
-            <div key={category.category} className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+            <div key={category.category} className="bg-gray-800 rounded-lg p-4 sm:p-6 border border-gray-700">
               <div className="flex items-center space-x-3 mb-6">
                 <Layers className={`w-5 h-5 ${category.color}`} />
-                <h2 className="text-xl font-semibold text-white">
+                <h2 className="text-lg sm:text-xl font-semibold text-white">
                   {category.category} Signals
                 </h2>
                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${category.bgColor} ${category.color} border ${category.borderColor}`}>
@@ -177,7 +177,7 @@ export function PromptEvaluatorPage() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {category.signals.map((signal) => {
                   const count = signalStats[signal.key as keyof SignalUsageStats] as number;
                   const percentage = getUsagePercentage(count);
@@ -185,10 +185,10 @@ export function PromptEvaluatorPage() {
 
                   return (
                     <div key={signal.key} className="bg-gray-900/50 rounded-lg p-4 border border-gray-700">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-white font-medium text-sm">{signal.name}</h3>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                        <h3 className="text-white font-medium text-sm leading-tight">{signal.name}</h3>
                         <div className="text-right">
-                          <span className={`text-lg font-bold ${category.color}`}>{count}</span>
+                          <span className={`text-base sm:text-lg font-bold ${category.color}`}>{count}</span>
                           <span className="text-gray-400 text-xs ml-1">
                             ({percentage.toFixed(1)}%)
                           </span>
@@ -219,13 +219,13 @@ export function PromptEvaluatorPage() {
 
         {/* Signal Usage Summary Chart */}
         {signalStats.totalRecommendations > 0 && (
-          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 mt-8">
-            <h2 className="text-xl font-semibold text-white mb-6 flex items-center space-x-2">
+          <div className="bg-gray-800 rounded-lg p-4 sm:p-6 border border-gray-700 mt-8">
+            <h2 className="text-lg sm:text-xl font-semibold text-white mb-6 flex items-center space-x-2">
               <BarChart3 className="w-5 h-5 text-blue-400" />
               <span>Signal Usage Overview</span>
             </h2>
             
-            <div className="space-y-3">
+            <div className="space-y-3 sm:space-y-4">
               {signalDefinitions.flatMap(category => 
                 category.signals.map(signal => {
                   const count = signalStats[signal.key as keyof SignalUsageStats] as number;
@@ -233,15 +233,15 @@ export function PromptEvaluatorPage() {
                   const barWidth = maxCount > 0 ? (count / maxCount) * 100 : 0;
                   
                   return (
-                    <div key={signal.key} className="flex items-center space-x-4">
-                      <div className="w-48 text-right">
-                        <span className="text-white text-sm font-medium">{signal.name}</span>
+                    <div key={signal.key} className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
+                      <div className="sm:w-48 sm:text-right">
+                        <span className="text-white text-xs sm:text-sm font-medium">{signal.name}</span>
                         <span className={`ml-2 px-2 py-1 rounded text-xs ${category.bgColor} ${category.color}`}>
                           {category.points}pt
                         </span>
                       </div>
                       
-                      <div className="flex-1 flex items-center space-x-3">
+                      <div className="flex-1 flex items-center space-x-2 sm:space-x-3">
                         <div className="flex-1 bg-gray-700 rounded-full h-3">
                           <div 
                             className={`h-3 rounded-full transition-all duration-500 ${category.color.replace('text-', 'bg-')}`}
@@ -249,7 +249,7 @@ export function PromptEvaluatorPage() {
                           ></div>
                         </div>
                         
-                        <div className="w-20 text-right">
+                        <div className="w-16 sm:w-20 text-right">
                           <span className={`text-sm font-bold ${category.color}`}>{count}</span>
                           <span className="text-gray-400 text-xs ml-1">({percentage.toFixed(1)}%)</span>
                         </div>
@@ -264,12 +264,12 @@ export function PromptEvaluatorPage() {
 
         {/* Insights and Recommendations */}
         {signalStats.totalRecommendations > 0 && (
-          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 mt-8">
-            <h2 className="text-xl font-semibold text-white mb-4">Prompt Quality Insights</h2>
+          <div className="bg-gray-800 rounded-lg p-4 sm:p-6 border border-gray-700 mt-8">
+            <h2 className="text-lg sm:text-xl font-semibold text-white mb-4">Prompt Quality Insights</h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               <div>
-                <h3 className="text-white font-medium mb-3">Most Frequently Used Signals</h3>
+                <h3 className="text-white font-medium mb-3 text-sm sm:text-base">Most Frequently Used Signals</h3>
                 <div className="space-y-2">
                   {Object.entries(signalStats)
                     .filter(([key]) => key !== 'totalRecommendations' && key !== 'averageConfluenceScore')
@@ -277,17 +277,17 @@ export function PromptEvaluatorPage() {
                     .slice(0, 3)
                     .map(([key, count]) => (
                       <div key={key} className="flex justify-between items-center text-sm">
-                        <span className="text-gray-300">
+                        <span className="text-gray-300 text-xs sm:text-sm">
                           {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
                         </span>
-                        <span className="text-green-400 font-medium">{count} times</span>
+                        <span className="text-green-400 font-medium text-xs sm:text-sm">{count} times</span>
                       </div>
                     ))}
                 </div>
               </div>
               
               <div>
-                <h3 className="text-white font-medium mb-3">Least Used Signals</h3>
+                <h3 className="text-white font-medium mb-3 text-sm sm:text-base">Least Used Signals</h3>
                 <div className="space-y-2">
                   {Object.entries(signalStats)
                     .filter(([key]) => key !== 'totalRecommendations' && key !== 'averageConfluenceScore')
@@ -295,10 +295,10 @@ export function PromptEvaluatorPage() {
                     .slice(0, 3)
                     .map(([key, count]) => (
                       <div key={key} className="flex justify-between items-center text-sm">
-                        <span className="text-gray-300">
+                        <span className="text-gray-300 text-xs sm:text-sm">
                           {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
                         </span>
-                        <span className="text-red-400 font-medium">{count} times</span>
+                        <span className="text-red-400 font-medium text-xs sm:text-sm">{count} times</span>
                       </div>
                     ))}
                 </div>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, TrendingDown, Minus, Target, Shield, Clock, AlertTriangle, CheckCircle, XCircle, Timer, Archive } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Target, Shield, Clock, AlertTriangle, CheckCircle, XCircle, Timer, Archive, Ban } from 'lucide-react';
 import { TradingRecommendation as TradingRecommendationType } from '../types/trading';
 
 interface TradingRecommendationProps {
@@ -54,6 +54,8 @@ export function TradingRecommendation({ recommendation }: TradingRecommendationP
         return <XCircle className="w-5 h-5 text-red-400" />;
       case 'expired':
         return <Archive className="w-5 h-5 text-gray-400" />;
+      case 'no_entry_hit':
+        return <Ban className="w-5 h-5 text-orange-400" />;
       default:
         return <Timer className="w-5 h-5 text-yellow-400" />;
     }
@@ -67,6 +69,8 @@ export function TradingRecommendation({ recommendation }: TradingRecommendationP
         return 'text-red-400 bg-red-400/10 border-red-400/20';
       case 'expired':
         return 'text-gray-400 bg-gray-400/10 border-gray-400/20';
+      case 'no_entry_hit':
+        return 'text-orange-400 bg-orange-400/10 border-orange-400/20';
       default:
         return 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20';
     }
@@ -80,6 +84,8 @@ export function TradingRecommendation({ recommendation }: TradingRecommendationP
         return 'Stop Loss Hit';
       case 'expired':
         return 'Expired';
+      case 'no_entry_hit':
+        return 'No Entry Hit';
       default:
         return 'Pending';
     }
@@ -95,48 +101,49 @@ export function TradingRecommendation({ recommendation }: TradingRecommendationP
     });
   };
   return (
-    <div className={`bg-gray-800 rounded-lg p-6 border transition-all duration-200 ${
+    <div className={`bg-gray-800 rounded-lg p-4 sm:p-6 border transition-all duration-200 ${
       recommendation.status === 'accurate' ? 'border-green-500/50 hover:border-green-500' :
       recommendation.status === 'inaccurate' ? 'border-red-500/50 hover:border-red-500' :
       recommendation.status === 'expired' ? 'border-gray-500/50 hover:border-gray-500' :
+      recommendation.status === 'no_entry_hit' ? 'border-orange-500/50 hover:border-orange-500' :
       'border-gray-700 hover:border-blue-500/50'
     }`}>
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center space-x-3">
-          <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center text-white font-bold">
+        <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center text-white font-bold text-xs sm:text-sm flex-shrink-0">
             {recommendation.crypto}
           </div>
-          <div>
-            <h3 className="text-white font-semibold text-lg">{recommendation.crypto}</h3>
-            <div className="flex items-center space-x-2">
-              <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full border text-sm font-medium ${getActionColor()}`}>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-white font-semibold text-base sm:text-lg truncate">{recommendation.crypto}</h3>
+            <div className="flex items-center space-x-1 sm:space-x-2 flex-wrap gap-1">
+              <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full border text-xs sm:text-sm font-medium ${getActionColor()}`}>
                 {getActionIcon()}
                 <span className="uppercase">{recommendation.action}</span>
               </div>
               <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full border text-xs font-medium ${getStatusColor()}`}>
                 {getStatusIcon()}
-                <span>{getStatusText()}</span>
+                <span className="hidden sm:inline">{getStatusText()}</span>
               </div>
             </div>
           </div>
         </div>
         
-        <div className="text-right">
+        <div className="text-right flex-shrink-0">
           <p className="text-gray-400 text-sm">Confidence</p>
-          <p className={`text-lg font-bold ${getConfidenceColor()}`}>
+          <p className={`text-base sm:text-lg font-bold ${getConfidenceColor()}`}>
             {recommendation.confidence}%
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
         <div className="bg-gray-900/50 rounded-lg p-3">
           <div className="flex items-center space-x-2 mb-1">
             <Target className="w-4 h-4 text-green-400" />
             <span className="text-gray-400 text-sm">Target</span>
           </div>
-          <p className="text-green-400 font-semibold">
-            ${recommendation.targetPrice.toLocaleString()}
+          <p className="text-green-400 font-semibold text-sm sm:text-base">
+            ${recommendation.targetPrice.toFixed(6)}
           </p>
         </div>
 
@@ -145,18 +152,18 @@ export function TradingRecommendation({ recommendation }: TradingRecommendationP
             <Shield className="w-4 h-4 text-red-400" />
             <span className="text-gray-400 text-sm">Stop Loss</span>
           </div>
-          <p className="text-red-400 font-semibold">
-            ${recommendation.stopLoss.toLocaleString()}
+          <p className="text-red-400 font-semibold text-sm sm:text-base">
+            ${recommendation.stopLoss.toFixed(6)}
           </p>
         </div>
       </div>
 
       {recommendation.entryPrice && (
         <div className="bg-gray-900/50 rounded-lg p-3 mb-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <span className="text-gray-400 text-sm">Entry Price</span>
-              <p className="text-white font-semibold">${recommendation.entryPrice.toLocaleString()}</p>
+              <p className="text-white font-semibold text-sm sm:text-base">${recommendation.entryPrice.toFixed(6)}</p>
             </div>
             <div className="text-right">
               <span className="text-gray-400 text-sm">Created</span>
@@ -171,7 +178,7 @@ export function TradingRecommendation({ recommendation }: TradingRecommendationP
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-4 text-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 mb-4 text-sm">
         <div className="flex items-center space-x-2">
           <Clock className="w-4 h-4 text-gray-400" />
           <span className="text-gray-400">Timeframe:</span>
@@ -188,9 +195,9 @@ export function TradingRecommendation({ recommendation }: TradingRecommendationP
 
       <div>
         <h4 className="text-white font-medium mb-2">Analysis Summary</h4>
-        <ul className="space-y-1">
+        <ul className="space-y-1 sm:space-y-2">
           {recommendation.reasoning.map((reason, index) => (
-            <li key={index} className="text-gray-300 text-sm flex items-start">
+            <li key={index} className="text-gray-300 text-xs sm:text-sm flex items-start leading-relaxed">
               <span className="text-blue-400 mr-2">•</span>
               {reason}
             </li>

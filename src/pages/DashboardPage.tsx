@@ -23,17 +23,17 @@ export function DashboardPage() {
   return (
     <main className="max-w-7xl mx-auto px-6 py-8">
       {/* Header Section */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
         <div>
-          <h2 className="text-2xl font-bold text-white mb-2">Trade Recommendation Evaluator</h2>
-          <p className="text-gray-400">Track and evaluate AI-powered trading recommendations performance</p>
+          <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">Trade Recommendation Evaluator</h2>
+          <p className="text-sm sm:text-base text-gray-400">Track and evaluate AI-powered trading recommendations performance</p>
         </div>
         
         <div className="flex items-center space-x-3">
           <button 
             onClick={refreshData}
             disabled={isLoading}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg transition-colors"
+            className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg transition-colors text-sm sm:text-base"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
@@ -49,11 +49,11 @@ export function DashboardPage() {
       {/* Filter and Recommendations Section */}
       <div className="space-y-6">
         {/* Filter Bar */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center space-x-2 flex-wrap">
             <Target className="w-5 h-5 text-blue-400" />
-            <h3 className="text-xl font-semibold text-white">Trade Recommendations</h3>
-            <span className="text-gray-400 text-sm">({filteredRecommendations.length} of {recommendations.length})</span>
+            <h3 className="text-lg sm:text-xl font-semibold text-white">Trade Recommendations</h3>
+            <span className="text-gray-400 text-xs sm:text-sm">({filteredRecommendations.length} of {recommendations.length})</span>
           </div>
           
           <div className="flex items-center space-x-2">
@@ -61,7 +61,7 @@ export function DashboardPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as any)}
-              className="bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-1 text-sm focus:outline-none focus:border-blue-500"
+              className="bg-gray-800 border border-gray-600 text-white rounded-lg px-2 sm:px-3 py-1 text-xs sm:text-sm focus:outline-none focus:border-blue-500 min-w-0"
             >
               <option value="all">All Status</option>
               <option value="pending">Pending</option>
@@ -74,21 +74,21 @@ export function DashboardPage() {
         </div>
         
         {/* Recommendations Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
           {filteredRecommendations.length > 0 ? filteredRecommendations.map((recommendation, index) => (
             <TradingRecommendation key={recommendation.id || index} recommendation={recommendation} />
           )) : (
-            <div className="col-span-full bg-gray-800 rounded-lg p-8 border border-gray-700 text-center">
+            <div className="col-span-full bg-gray-800 rounded-lg p-6 sm:p-8 border border-gray-700 text-center">
               {isLoading ? (
                 <div className="text-gray-400">
                   <RefreshCw className="w-8 h-8 mx-auto mb-2 animate-spin" />
-                  <p className="text-gray-300">Loading trade recommendations...</p>
+                  <p className="text-gray-300 text-sm sm:text-base">Loading trade recommendations...</p>
                   <p className="text-gray-500 text-sm mt-1">Fetching evaluation data from database</p>
                 </div>
               ) : (
                 <div className="text-gray-400">
                   <Target className="w-12 h-12 mx-auto mb-3 text-gray-600" />
-                  <p className="text-gray-300 font-medium mb-2">
+                  <p className="text-gray-300 font-medium mb-2 text-sm sm:text-base">
                     {statusFilter === 'all' ? 'No recommendations found' : `No ${statusFilter} recommendations`}
                   </p>
                   <p className="text-gray-500 text-sm">
@@ -106,7 +106,11 @@ export function DashboardPage() {
 
       {/* Status Footer */}
       <div className="mt-8 text-center text-gray-500 text-sm">
-        <p>Last updated: {lastUpdate.toLocaleTimeString()} • Evaluations run every 4 hours</p>
+        <p className="flex flex-col sm:flex-row sm:justify-center sm:space-x-2">
+          <span>Last updated: {lastUpdate.toLocaleTimeString()}</span>
+          <span className="hidden sm:inline">•</span>
+          <span>Evaluations run every 4 hours</span>
+        </p>
         <p className="mt-1">Use Discord commands to generate new recommendations</p>
       </div>
     </main>
