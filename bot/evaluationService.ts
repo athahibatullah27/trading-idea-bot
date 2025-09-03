@@ -1,7 +1,7 @@
 import { supabase } from './supabaseClient.js';
 import { fetchCandlestickData } from './derivativesDataService.js';
 import { TradingRecommendation } from './types.js';
-import { SignalAnalysisResult, analyzeReasoningForSignals } from './utils/signalAnalysis.js';
+import { SignalAnalysisResult, SignalUsageStats, analyzeReasoningForSignals } from './utils/signalAnalysis.js';
 import { 
   logDatabaseOperation, 
   logDatabaseError, 
@@ -400,5 +400,97 @@ export async function getEvaluationStats(): Promise<{
     logFunctionExit('getEvaluationStats', { total: 0, pending: 0, accurate: 0, inaccurate: 0, expired: 0, noEntryHit: 0, accuracyRate: 0 });
     endPerformanceTimer(timerId);
     return { total: 0, pending: 0, accurate: 0, inaccurate: 0, expired: 0, noEntryHit: 0, accuracyRate: 0 };
+  }
+}
+// Function to get signal usage statistics
+export async function getSignalUsageStats(): Promise<SignalUsageStats> {
+  const timerId = startPerformanceTimer('getSignalUsageStats');
+  logFunctionEntry('getSignalUsageStats');
+  
+  try {
+    logDatabaseOperation({
+      operation: 'SELECT',
+      table: 'trade_recommendations',
+      query: 'SELECT signal columns and confluence_score FROM trade_recommendations'
+    });
+    
+    const { data, error } = await supabase
+      .from('trade_recommendations')
+      .select(`
+        signal_mt_trend_aligned,
+        signal_volume_confirmed,
+        signal_market_regime_consistent,
+        signal_fibonacci_confluence,
+        signal_sr_reaction,
+        signal_momentum_alignment,
+        signal_bollinger_position,
+        signal_ema_alignment,
+        signal_candlestick_patterns,
+        confluence_score
+      `);
+
+    if (error) {
+      logDatabaseError('SELECT', 'trade_recommendations', error);
+      logFunctionExit('getSignalUsageStats', null);
+      endPerformanceTimer(timerId);
+      return {
+        multiTimeframeTrendAlignment: 0,
+        volumeConfirmation: 0,
+        marketRegimeConsistency: 0,
+        fibonacciConfluence: 0,
+        supportResistanceReaction: 0,
+        momentumAlignment: 0,
+        bollingerBandPosition: 0,
+        emaAlignment: 0,
+        candlestickPatterns: 0,
+        totalRecommendations: 0,
+        averageConfluenceScore: 0
+      };
+    }
+
+    logDatabaseOperation({
+      operation: 'SELECT',
+      table: 'trade_recommendations',
+      resultCount: data.length
+    });
+
+    // Count signal usage
+    const stats: SignalUsageStats = {
+      multiTimeframeTrendAlignment: data.filter(r => r.signal_mt_trend_aligned).length,
+      volumeConfirmation: data.filter(r => r.signal_volume_confirmed).length,
+      marketRegimeConsistency: data.filter(r => r.signal_market_regime_consistent).length,
+      fibonacciConfluence: data.filter(r => r.signal_fibonacci_confluence).length,
+      supportResistanceReaction: data.filter(r => r.signal_sr_reaction).length,
+      momentumAlignment: data.filter(r => r.signal_momentum_alignment).length,
+      bollingerBandPosition: data.filter(r => r.signal_bollinger_position).length,
+      emaAlignment: data.filter(r => r.signal_ema_alignment).length,
+      candlestickPatterns: data.filter(r => r.signal_candlestick_patterns).length,
+      totalRecommendations: data.length,
+      averageConfluenceScore: data.length > 0 
+        ? data.reduce((sum, r) => sum + (r.confluence_score || 0), 0) / data.length 
+        : 0
+    };
+
+    log('INFO', 'Signal usage stats calculated', stats);
+    logFunctionExit('getSignalUsageStats', stats);
+    endPerformanceTimer(timerId);
+    return stats;
+  } catch (error) {
+    log('ERROR', 'Error calculating signal usage stats', error);
+    logFunctionExit('getSignalUsageStats', null);
+    endPerformanceTimer(timerId);
+    return {
+      multiTimeframeTrendAlignment: 0,
+      volumeConfirmation: 0,
+      marketRegimeConsistency: 0,
+      fibonacciConfluence: 0,
+      supportResistanceReaction: 0,
+      momentumAlignment: 0,
+      bollingerBandPosition: 0,
+      emaAlignment: 0,
+      candlestickPatterns: 0,
+      totalRecommendations: 0,
+      averageConfluenceScore: 0
+    };
   }
 }
