@@ -143,7 +143,7 @@ export function TradingRecommendation({ recommendation }: TradingRecommendationP
             <span className="text-gray-400 text-sm">Target</span>
           </div>
           <p className="text-green-400 font-semibold">
-            ${recommendation.targetPrice.toLocaleString()}
+            ${recommendation.targetPrice.toFixed(6)}
           </p>
         </div>
 
@@ -153,7 +153,7 @@ export function TradingRecommendation({ recommendation }: TradingRecommendationP
             <span className="text-gray-400 text-sm">Stop Loss</span>
           </div>
           <p className="text-red-400 font-semibold">
-            ${recommendation.stopLoss.toLocaleString()}
+            ${recommendation.stopLoss.toFixed(6)}
           </p>
         </div>
       </div>
@@ -163,7 +163,7 @@ export function TradingRecommendation({ recommendation }: TradingRecommendationP
           <div className="flex items-center justify-between">
             <div>
               <span className="text-gray-400 text-sm">Entry Price</span>
-              <p className="text-white font-semibold">${recommendation.entryPrice.toLocaleString()}</p>
+              <p className="text-white font-semibold">${recommendation.entryPrice.toFixed(6)}</p>
             </div>
             <div className="text-right">
               <span className="text-gray-400 text-sm">Created</span>
