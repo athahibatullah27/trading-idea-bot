@@ -224,7 +224,36 @@ export function analyzeReasoningForSignals(reasoning: string[]): SignalAnalysisR
       const signalFound = keywords.some(keyword => fullReasoningText.includes(keyword));
       
       if (signalFound) {
-        result[signalKey as keyof SignalAnalysisResult] = true;
+        // Use explicit assignment to avoid TypeScript type issues
+        switch (signalKey) {
+          case 'signal_mt_trend_aligned':
+            result.signal_mt_trend_aligned = true;
+            break;
+          case 'signal_volume_confirmed':
+            result.signal_volume_confirmed = true;
+            break;
+          case 'signal_market_regime_consistent':
+            result.signal_market_regime_consistent = true;
+            break;
+          case 'signal_fibonacci_confluence':
+            result.signal_fibonacci_confluence = true;
+            break;
+          case 'signal_sr_reaction':
+            result.signal_sr_reaction = true;
+            break;
+          case 'signal_momentum_alignment':
+            result.signal_momentum_alignment = true;
+            break;
+          case 'signal_bollinger_position':
+            result.signal_bollinger_position = true;
+            break;
+          case 'signal_ema_alignment':
+            result.signal_ema_alignment = true;
+            break;
+          case 'signal_candlestick_patterns':
+            result.signal_candlestick_patterns = true;
+            break;
+        }
         result.confluence_score += SIGNAL_POINTS[signalKey as keyof typeof SIGNAL_POINTS];
         
         log('INFO', `Signal activated: ${signalKey} (+${SIGNAL_POINTS[signalKey as keyof typeof SIGNAL_POINTS]} points)`);
@@ -272,7 +301,7 @@ export function parseActivatedSignalsFromGemini(activatedSignals: string[]): Sig
   logFunctionEntry('parseActivatedSignalsFromGemini', { signalCount: activatedSignals.length });
   
   try {
-    const result: SignalAnalysisResult = {
+    const result = {
       signal_mt_trend_aligned: false,
       signal_volume_confirmed: false,
       signal_market_regime_consistent: false,
@@ -283,7 +312,7 @@ export function parseActivatedSignalsFromGemini(activatedSignals: string[]): Sig
       signal_ema_alignment: false,
       signal_candlestick_patterns: false,
       confluence_score: 0
-    };
+    } as SignalAnalysisResult;
     
     // Map Gemini signal names to our database column names
     const signalMapping: { [key: string]: keyof SignalAnalysisResult } = {
@@ -304,7 +333,35 @@ export function parseActivatedSignalsFromGemini(activatedSignals: string[]): Sig
       const dbColumnName = signalMapping[normalizedSignalName];
       
       if (dbColumnName && dbColumnName !== 'confluence_score') {
-        result[dbColumnName] = true;
+        switch (dbColumnName) {
+          case 'signal_mt_trend_aligned':
+            result.signal_mt_trend_aligned = true;
+            break;
+          case 'signal_volume_confirmed':
+            result.signal_volume_confirmed = true;
+            break;
+          case 'signal_market_regime_consistent':
+            result.signal_market_regime_consistent = true;
+            break;
+          case 'signal_fibonacci_confluence':
+            result.signal_fibonacci_confluence = true;
+            break;
+          case 'signal_sr_reaction':
+            result.signal_sr_reaction = true;
+            break;
+          case 'signal_momentum_alignment':
+            result.signal_momentum_alignment = true;
+            break;
+          case 'signal_bollinger_position':
+            result.signal_bollinger_position = true;
+            break;
+          case 'signal_ema_alignment':
+            result.signal_ema_alignment = true;
+            break;
+          case 'signal_candlestick_patterns':
+            result.signal_candlestick_patterns = true;
+            break;
+        }
         result.confluence_score += SIGNAL_POINTS[dbColumnName as keyof typeof SIGNAL_POINTS];
         
         log('INFO', `Gemini signal activated: ${signalName} -> ${dbColumnName} (+${SIGNAL_POINTS[dbColumnName as keyof typeof SIGNAL_POINTS]} points)`);

@@ -911,8 +911,7 @@ function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivat
             ).slice(0, 4) // Limit to 4 reasons max
           : ['No high-probability setup identified due to conflicting signals'],
         symbol: marketData.symbol,
-        timeframe: 'No trade recommended',
-        activatedSignals: activatedSignals // Pass through for potential storage
+        timeframe: 'No trade recommended'
       };
     }
     
@@ -979,8 +978,7 @@ function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivat
         tradeData.technicalReasoning.slice(0, 6) : 
         ['Multi-timeframe technical analysis completed based on current market conditions'],
       symbol: marketData.symbol,
-      timeframe: tradeData.timeframe || '6-24 hours',
-      activatedSignals: activatedSignals // Pass through for storage
+      timeframe: tradeData.timeframe || '6-24 hours'
     };
     
     log('INFO', `Parsed derivatives trade idea: ${tradeIdea.direction.toUpperCase()} ${tradeIdea.symbol} at $${tradeIdea.entry.toFixed(5)}, Target: $${tradeIdea.targetPrice.toFixed(5)}, R/R: ${tradeIdea.riskReward}:1 (Confidence: ${tradeIdea.confidence}%)`);
