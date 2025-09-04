@@ -182,3 +182,8 @@ export interface DerivativesTradeIdea {
   timeframe: string;
   activatedSignals?: string[];
 }
+
+export interface GeneratedTradeIdeaResult {
+  tradeIdea: DerivativesTradeIdea | null;
+  modelUsed: string | null; // The name of the model that successfully generated the trade idea
+}

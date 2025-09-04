@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import axios from 'axios';
-import { CryptoData, NewsItem, MarketConditions, TradingRecommendation } from './types.js';
+import { CryptoData, NewsItem, MarketConditions, TradingRecommendation, GeneratedTradeIdeaResult } from './types.js';
 import { EnhancedDerivativesMarketData } from './types.js';
 import dotenv from 'dotenv';
 import { 
@@ -381,10 +381,12 @@ function parseGeminiResponse(text: string, cryptoData: CryptoData[]): TradingRec
 export async function generateDerivativesTradeIdea(
   marketData: EnhancedDerivativesMarketData,
   context?: string
-): Promise<DerivativesTradeIdea | null> {
+): Promise<GeneratedTradeIdeaResult> { // Changed return type
   const timerId = startPerformanceTimer('generateDerivativesTradeIdea');
   logFunctionEntry('generateDerivativesTradeIdea', { symbol: marketData.symbol });
   
+  let modelAttempted: string | null = null; // To track which model was attempted/used
+
   try {
     log('INFO', `Generating derivatives trade idea for ${marketData.symbol} using Gemini...`);
     
@@ -392,15 +394,16 @@ export async function generateDerivativesTradeIdea(
       log('ERROR', 'GEMINI_API_KEY is not configured');
       logFunctionExit('generateDerivativesTradeIdea', null);
       endPerformanceTimer(timerId);
-      return null;
+      return { tradeIdea: null, modelUsed: null }; // Return new structure
     }
 
-    // Construct the prompt for derivatives trade analysis
+    // Primary attempt with GEMINI_MODEL
+    modelAttempted = GEMINI_MODEL;
     const prompt = buildEnhancedDerivativesTradePrompt(marketData);
     
     log('INFO', 'Sending derivatives trade prompt to Gemini API...');
     const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
-    // Log API request (without sensitive data)
+    
     logApiRequest({
       endpoint: 'Gemini AI API (Derivatives)',
       method: 'POST',
@@ -417,12 +420,10 @@ export async function generateDerivativesTradeIdea(
       context
     });
     
-    // Generate content using Gemini
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
     
-    // For promptcheck command, log the complete response
     if (context === 'promptcheck-debug') {
       console.log('\n' + '='.repeat(80));
       console.log('🔍 PROMPT CHECK: COMPLETE GEMINI RESPONSE');
@@ -442,49 +443,53 @@ export async function generateDerivativesTradeIdea(
     
     log('INFO', 'Received derivatives trade response from Gemini API');
     
-    // Parse the JSON response
     const tradeIdea = parseDerivativesTradeResponse(text, marketData);
     
     if (!tradeIdea) {
       log('ERROR', 'Failed to parse valid trade idea from Gemini');
       logFunctionExit('generateDerivativesTradeIdea', null);
       endPerformanceTimer(timerId);
-      return null;
+      return { tradeIdea: null, modelUsed: null }; // Return new structure
     }
     
     log('INFO', `Generated derivatives trade idea: ${tradeIdea.direction.toUpperCase()} ${tradeIdea.symbol}`);
     logFunctionExit('generateDerivativesTradeIdea', { 
       direction: tradeIdea.direction, 
-      confidence: tradeIdea.confidence 
+      confidence: tradeIdea.confidence,
+      modelUsed: modelAttempted // Log the model used
     });
     endPerformanceTimer(timerId);
-    return tradeIdea;
+    return { tradeIdea, modelUsed: modelAttempted }; // Return new structure
     
   } catch (error) {
     log('ERROR', 'Error generating derivatives trade idea', error.message);
     
-    // Check if this is a quota/rate limit error
     if (error.message && (error.message.includes('429') || error.message.includes('Too Many Requests') || error.message.includes('quota'))) {
       log('WARN', 'Gemini API quota exceeded for derivatives trade');
       
       try {
-        const fallbackTradeIdea = await generateOpenRouterDerivativesTradeIdea(marketData, context);
+        // Fallback attempt with OPENROUTER_GEMINI_MODEL
+        modelAttempted = OPENROUTER_GEMINI_MODEL; // Update model attempted
+        // Assuming generateOpenRouterDerivativesTradeIdea returns DerivativesTradeIdea | null
+        const fallbackTradeIdea = await generateOpenRouterDerivativesTradeIdea(marketData, context); 
+        
         if (fallbackTradeIdea) {
           log('INFO', `Successfully generated derivatives trade idea using OpenRouter fallback`);
           logFunctionExit('generateDerivativesTradeIdea', { 
             direction: fallbackTradeIdea.direction, 
             confidence: fallbackTradeIdea.confidence,
-            source: 'openrouter'
+            source: 'openrouter',
+            modelUsed: modelAttempted // Log the model used
           });
           endPerformanceTimer(timerId);
-          return fallbackTradeIdea;
+          return { tradeIdea: fallbackTradeIdea, modelUsed: modelAttempted }; // Return new structure
         }
       } catch (fallbackError) {
         log('ERROR', 'OpenRouter fallback also failed for derivatives trade', fallbackError.message);
       }
       
       // If both APIs fail, return quota exceeded indicator
-      return {
+      const quotaExceededIdea: DerivativesTradeIdea = {
         direction: 'long' as const,
         entry: 0,
         targetPrice: 0,
@@ -499,6 +504,8 @@ export async function generateDerivativesTradeIdea(
         symbol: 'QUOTA_EXCEEDED',
         timeframe: 'Please try again later'
       };
+      
+      return { tradeIdea: quotaExceededIdea, modelUsed: null }; // Return new structure for quota exceeded
     }
     
     logApiResponse({
@@ -509,7 +516,7 @@ export async function generateDerivativesTradeIdea(
     
     logFunctionExit('generateDerivativesTradeIdea', null);
     endPerformanceTimer(timerId);
-    return null;
+    return { tradeIdea: null, modelUsed: null }; // Return new structure for generic errors
   }
 }
 

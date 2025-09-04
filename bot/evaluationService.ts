@@ -24,7 +24,7 @@ export interface StoredTradeRecommendation extends TradingRecommendation {
 export async function storeTradeRecommendation(
   recommendation: TradingRecommendation,
   entryPrice: number,
-  geminiModelUsed: string
+  geminiModelUsed: string | null
 ): Promise<boolean> {
   const timerId = startPerformanceTimer('storeTradeRecommendation');
   logFunctionEntry('storeTradeRecommendation', { 
