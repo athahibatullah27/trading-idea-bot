@@ -6,7 +6,140 @@ interface TradingRecommendationProps {
   recommendation: TradingRecommendationType;
 }
 
+// Signal keywords mapping - matches the bot's signal analysis
+const SIGNAL_HIGHLIGHT_KEYWORDS = {
+  signal_mt_trend_aligned: [
+    'multi-timeframe trend alignment',
+    'multi-timeframe alignment',
+    'timeframe alignment',
+    'aligned trends',
+    'higher timeframe confirmation',
+    'trend alignment across timeframes',
+    'all timeframes align',
+    'timeframes support',
+    'multi-tf alignment',
+    'cross-timeframe trend'
+  ],
+  signal_volume_confirmed: [
+    'volume confirms',
+    'volume confirmation',
+    'above-average volume',
+    'volume supporting',
+    'volume analysis shows',
+    'strong volume',
+    'volume trend',
+    'institutional volume',
+    'volume validates',
+    'volume backing'
+  ],
+  signal_market_regime_consistent: [
+    'market regime consistency',
+    'consistent market regime',
+    'regime alignment',
+    'market regime shows',
+    'regime analysis',
+    'trending regime',
+    'ranging regime',
+    'regime classification',
+    'market structure',
+    'regime confirms'
+  ],
+  signal_fibonacci_confluence: [
+    'fibonacci confluence',
+    'fib levels',
+    'fibonacci retracement',
+    'fibonacci extension',
+    'fib support',
+    'fib resistance',
+    'key fibonacci',
+    'fibonacci zone',
+    'fib cluster',
+    'fibonacci analysis'
+  ],
+  signal_sr_reaction: [
+    'support/resistance',
+    'support and resistance',
+    's/r levels',
+    'key levels',
+    'price respecting',
+    'resistance level',
+    'support level',
+    'key support',
+    'key resistance',
+    'horizontal levels'
+  ],
+  signal_momentum_alignment: [
+    'momentum alignment',
+    'rsi and macd trends',
+    'momentum indicators',
+    'momentum confirms',
+    'rsi trend',
+    'macd trend',
+    'momentum analysis',
+    'oscillator alignment',
+    'momentum supporting',
+    'momentum divergence'
+  ],
+  signal_bollinger_position: [
+    'bollinger band position',
+    'bollinger bands',
+    'bb bands',
+    'price relative to bb',
+    'bollinger analysis',
+    'band position',
+    'bb upper',
+    'bb lower',
+    'bb middle',
+    'band squeeze'
+  ],
+  signal_ema_alignment: [
+    'ema alignment',
+    'ema crossover',
+    'price relative to emas',
+    'ema analysis',
+    'moving average',
+    'ema support',
+    'ema resistance',
+    'ema trend',
+    'exponential moving average',
+    'ma alignment'
+  ],
+  signal_candlestick_patterns: [
+    'candlestick patterns',
+    'reversal patterns',
+    'continuation patterns',
+    'candle analysis',
+    'price action',
+    'candlestick formation',
+    'pattern recognition',
+    'candle pattern',
+    'price pattern',
+    'chart pattern'
+  ]
+};
+
 export function TradingRecommendation({ recommendation }: TradingRecommendationProps) {
+  // Function to check if a reasoning point should be highlighted based on activated signals
+  const isReasonActivated = (reasonText: string): boolean => {
+    const lowerReasonText = reasonText.toLowerCase();
+    
+    // Check each signal type
+    for (const [signalKey, keywords] of Object.entries(SIGNAL_HIGHLIGHT_KEYWORDS)) {
+      // Check if this signal is activated in the recommendation
+      const signalActivated = (recommendation as any)[signalKey] === true;
+      
+      if (signalActivated) {
+        // Check if any keywords for this signal appear in the reasoning text
+        const keywordFound = keywords.some(keyword => lowerReasonText.includes(keyword));
+        if (keywordFound) {
+          return true;
+        }
+      }
+    }
+    
+    return false;
+  };
+
   const getActionIcon = () => {
     switch (recommendation.action) {
       case 'buy':
@@ -197,7 +330,9 @@ export function TradingRecommendation({ recommendation }: TradingRecommendationP
         <h4 className="text-white font-medium mb-2">Analysis Summary</h4>
         <ul className="space-y-1 sm:space-y-2">
           {recommendation.reasoning.map((reason, index) => (
-            <li key={index} className="text-gray-300 text-xs sm:text-sm flex items-start leading-relaxed">
+            <li key={index} className={`text-xs sm:text-sm flex items-start leading-relaxed ${
+              isReasonActivated(reason) ? 'text-green-400' : 'text-gray-300'
+            }`}>
               <span className="text-blue-400 mr-2">•</span>
               {reason}
             </li>
