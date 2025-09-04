@@ -58,10 +58,14 @@ export async function getEvaluatedRecommendationsFromAPI(): Promise<TradingRecom
     // Transform the data to match our frontend interface
     const recommendations = rawRecommendations.map((rec: any) => ({
       ...rec,
-      geminiModelUsed: rec.gemini_model_used // Convert snake_case to camelCase
+      geminiModelUsed: rec.gemini_model_used || rec.geminiModelUsed || 'Unknown' // Convert snake_case to camelCase with fallback
     }));
     
     console.log(`✅ Frontend: Successfully received ${recommendations.length} evaluated recommendations`);
+    console.log(`🔍 Frontend: Sample recommendation model data:`, {
+      gemini_model_used: rawRecommendations[0]?.gemini_model_used,
+      geminiModelUsed: recommendations[0]?.geminiModelUsed
+    });
     console.log(`📊 Frontend: Recommendation statuses:`, {
       pending: recommendations.filter((r: TradingRecommendation) => r.status === 'pending').length,
       accurate: recommendations.filter((r: TradingRecommendation) => r.status === 'accurate').length,
