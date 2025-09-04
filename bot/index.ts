@@ -32,6 +32,10 @@ import {
 // Load environment variables
 dotenv.config();
 
+// Load model configurations from environment variables
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+const OPENROUTER_GEMINI_MODEL = process.env.OPENROUTER_GEMINI_MODEL || 'google/gemini-2.0-flash-exp:free';
+
 // Log application startup
 logAppState('STARTUP', { message: 'Crypto Trading Bot starting up...' });
 
@@ -229,7 +233,7 @@ app.get('/api/gemini-recommendations', async (req, res) => {
     for (const recommendation of recommendations) {
       const cryptoData = await getRealTimeCryptoData(recommendation.crypto, 'gemini recommendations');
       const entryPrice = cryptoData?.price || recommendation.targetPrice;
-      await storeTradeRecommendation(recommendation, entryPrice);
+      await storeTradeRecommendation(recommendation, entryPrice, GEMINI_MODEL);
     }
     
     log('INFO', `Successfully generated ${recommendations.length} Gemini recommendations`);
@@ -897,7 +901,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         
         // Send each recommendation as a separate embed
         for (const recommendation of recommendations) {
-          await storeTradeRecommendation(recommendation, recommendation.targetPrice);
+          await storeTradeRecommendation(recommendation, recommendation.targetPrice, GEMINI_MODEL);
         }
 
         logDiscordInteraction('FOLLOW_UP', {
@@ -1320,7 +1324,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             
             // Store in Supabase with entry price
             const currentPrice = marketData.timeframes['1h'].indicators.currentPrice;
-            const stored = await storeTradeRecommendation(mappedRecommendation, tradeIdea.entry);
+            const stored = await storeTradeRecommendation(mappedRecommendation, tradeIdea.entry, OPENROUTER_GEMINI_MODEL);
             
           } catch (storeError) {
             log('ERROR', 'Error storing derivatives trade idea', storeError);
