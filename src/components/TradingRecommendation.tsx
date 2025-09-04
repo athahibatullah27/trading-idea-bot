@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, TrendingDown, Minus, Target, Shield, Clock, AlertTriangle, CheckCircle, XCircle, Timer, Archive, Ban, Cpu } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Target, Shield, Clock, AlertTriangle, CheckCircle, XCircle, Timer, Archive, Ban, Info } from 'lucide-react';
 import { TradingRecommendation as TradingRecommendationType } from '../types/trading';
 
 interface TradingRecommendationProps {
@@ -257,18 +257,26 @@ export function TradingRecommendation({ recommendation }: TradingRecommendationP
                 {getStatusIcon()}
                 <span className="hidden sm:inline">{getStatusText()}</span>
               </div>
-              {recommendation.geminiModelUsed && (
-                <div className="inline-flex items-center space-x-1 px-2 py-1 rounded-full border border-purple-400/20 bg-purple-400/10 text-purple-400 text-xs font-medium">
-                  <Cpu className="w-3 h-3" />
-                  <span className="hidden sm:inline">{recommendation.geminiModelUsed}</span>
-                  <span className="sm:hidden">AI</span>
-                </div>
-              )}
             </div>
           </div>
         </div>
         
-        <div className="text-right flex-shrink-0">
+        <div className="text-right flex-shrink-0 relative">
+          {/* Model Info Icon with Hover Tooltip */}
+          {recommendation.geminiModelUsed && (
+            <div className="group absolute -top-2 -right-2 z-10">
+              <div className="w-5 h-5 bg-gray-700 hover:bg-gray-600 rounded-full flex items-center justify-center cursor-help transition-colors">
+                <Info className="w-3 h-3 text-gray-400 group-hover:text-white" />
+              </div>
+              {/* Tooltip */}
+              <div className="absolute bottom-full right-0 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap border border-gray-600">
+                <div className="text-gray-300">Model:</div>
+                <div className="font-medium">{recommendation.geminiModelUsed}</div>
+                {/* Tooltip arrow */}
+                <div className="absolute top-full right-2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-600"></div>
+              </div>
+            </div>
+          )}
           <p className="text-gray-400 text-sm">Confidence</p>
           <p className={`text-base sm:text-lg font-bold ${getConfidenceColor()}`}>
             {recommendation.confidence}%
