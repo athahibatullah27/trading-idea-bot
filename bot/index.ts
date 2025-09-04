@@ -10,7 +10,7 @@ import { generateGeminiRecommendations } from './geminiService.js';
 import { commands } from './commands.js';
 import { fetchCoinDeskNews, testCoinDeskAPI } from './newsService.js';
 import { getEnhancedDerivativesMarketData, testBinanceFuturesAPI } from './derivativesDataService.js';
-import { getSignalUsageStats } from './evaluationService.js';
+import { getSignalUsageStats, getEvaluationStatsByModel, getConfidenceDistributionByModel, getRiskLevelDistributionByModel } from './evaluationService.js';
 import { generateDerivativesTradeIdea, DerivativesTradeIdea } from './geminiService.js';
 import { buildEnhancedDerivativesTradePrompt } from './geminiService.js';
 import { supabase } from './supabaseClient.js';
@@ -356,6 +356,39 @@ app.get('/api/evaluation-stats', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch statistics' });
   } finally {
     endPerformanceTimer(timerId);
+  }
+});
+
+// API endpoint to get evaluation statistics by model
+app.get('/api/evaluation-stats-by-model', async (req, res) => {
+  try {
+    const statsByModel = await getEvaluationStatsByModel();
+    res.json(statsByModel);
+  } catch (error) {
+    console.error('Error fetching evaluation stats by model:', error);
+    res.status(500).json({ error: 'Failed to fetch evaluation statistics by model' });
+  }
+});
+
+// API endpoint to get confidence distribution by model
+app.get('/api/confidence-distribution-by-model', async (req, res) => {
+  try {
+    const distribution = await getConfidenceDistributionByModel();
+    res.json(distribution);
+  } catch (error) {
+    console.error('Error fetching confidence distribution by model:', error);
+    res.status(500).json({ error: 'Failed to fetch confidence distribution by model' });
+  }
+});
+
+// API endpoint to get risk level distribution by model
+app.get('/api/risk-distribution-by-model', async (req, res) => {
+  try {
+    const distribution = await getRiskLevelDistributionByModel();
+    res.json(distribution);
+  } catch (error) {
+    console.error('Error fetching risk level distribution by model:', error);
+    res.status(500).json({ error: 'Failed to fetch risk level distribution by model' });
   }
 });
 

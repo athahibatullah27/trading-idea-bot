@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Header } from './components/Header';
 import { DashboardPage } from './pages/DashboardPage';
 import { PromptEvaluatorPage } from './pages/PromptEvaluatorPage';
+import { ModelPerformancePage } from './pages/ModelPerformancePage';
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/prompt-evaluator" element={<PromptEvaluatorPage />} />
+          <Route path="/model-performance" element={<ModelPerformancePage />} />
         </Routes>
       </div>
     </Router>

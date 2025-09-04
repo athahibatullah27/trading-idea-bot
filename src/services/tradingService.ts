@@ -117,6 +117,123 @@ export async function getEvaluationStatsFromAPI(): Promise<{
   }
 }
 
+// Function to get evaluation statistics grouped by model from API
+export async function getEvaluationStatsByModelFromAPI(): Promise<{
+  [modelName: string]: {
+    total: number;
+    pending: number;
+    accurate: number;
+    inaccurate: number;
+    expired: number;
+    noEntryHit: number;
+    accuracyRate: number;
+  }
+}> {
+  try {
+    console.log('📈 Frontend: Requesting evaluation statistics by model via proxy...');
+    
+    const response = await fetch(`${API_PROXY_BASE}/evaluation-stats-by-model`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      signal: AbortSignal.timeout(10000), // 10 second timeout
+      mode: 'cors', // Enable CORS
+      credentials: 'omit' // Don't send credentials
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} ${response.statusText}`);
+    }
+    
+    const stats = await response.json();
+    console.log(`✅ Frontend: Successfully received evaluation statistics by model:`, stats);
+    
+    return stats;
+
+  } catch (error) {
+    console.error('❌ Frontend: Error fetching evaluation statistics by model:', (error as Error).message);
+    return {};
+  }
+}
+
+// Function to get confidence distribution by model from API
+export async function getConfidenceDistributionByModelFromAPI(): Promise<{
+  [modelName: string]: {
+    '0-20': number;
+    '21-40': number;
+    '41-60': number;
+    '61-80': number;
+    '81-100': number;
+  }
+}> {
+  try {
+    console.log('📊 Frontend: Requesting confidence distribution by model via proxy...');
+    
+    const response = await fetch(`${API_PROXY_BASE}/confidence-distribution-by-model`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      signal: AbortSignal.timeout(10000), // 10 second timeout
+      mode: 'cors', // Enable CORS
+      credentials: 'omit' // Don't send credentials
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} ${response.statusText}`);
+    }
+    
+    const distribution = await response.json();
+    console.log(`✅ Frontend: Successfully received confidence distribution by model:`, distribution);
+    
+    return distribution;
+
+  } catch (error) {
+    console.error('❌ Frontend: Error fetching confidence distribution by model:', (error as Error).message);
+    return {};
+  }
+}
+
+// Function to get risk level distribution by model from API
+export async function getRiskLevelDistributionByModelFromAPI(): Promise<{
+  [modelName: string]: {
+    low: number;
+    medium: number;
+    high: number;
+  }
+}> {
+  try {
+    console.log('📊 Frontend: Requesting risk level distribution by model via proxy...');
+    
+    const response = await fetch(`${API_PROXY_BASE}/risk-distribution-by-model`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      signal: AbortSignal.timeout(10000), // 10 second timeout
+      mode: 'cors', // Enable CORS
+      credentials: 'omit' // Don't send credentials
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} ${response.statusText}`);
+    }
+    
+    const distribution = await response.json();
+    console.log(`✅ Frontend: Successfully received risk level distribution by model:`, distribution);
+    
+    return distribution;
+
+  } catch (error) {
+    console.error('❌ Frontend: Error fetching risk level distribution by model:', (error as Error).message);
+    return {};
+  }
+}
+
 // Function to get signal usage statistics from API
 export async function getSignalUsageStatsFromAPI(): Promise<SignalUsageStats> {
   try {

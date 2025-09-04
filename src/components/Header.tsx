@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Bot, Target } from 'lucide-react';
+import { Bot, Target, Cpu } from 'lucide-react';
 
 export function Header() {
   const location = useLocation();
@@ -45,6 +45,18 @@ export function Header() {
           >
             <Target className="w-4 h-4" />
             <span className="text-xs sm:text-sm">Prompt Evaluator</span>
+          </Link>
+          
+          <Link
+            to="/model-performance"
+            className={`flex items-center space-x-2 px-2 sm:px-3 py-2 rounded-lg transition-colors ${
+              isActive('/model-performance') 
+                ? 'bg-green-600 text-white' 
+                : 'text-gray-300 hover:text-white hover:bg-gray-800'
+            }`}
+          >
+            <Cpu className="w-4 h-4" />
+            <span className="text-xs sm:text-sm">Model Performance</span>
           </Link>
         </nav>
       </div>

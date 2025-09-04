@@ -23,17 +23,19 @@ export interface StoredTradeRecommendation extends TradingRecommendation {
 // Function to store a trade recommendation in Supabase
 export async function storeTradeRecommendation(
   recommendation: TradingRecommendation,
-  entryPrice: number
+  entryPrice: number,
+  geminiModelUsed: string
 ): Promise<boolean> {
   const timerId = startPerformanceTimer('storeTradeRecommendation');
   logFunctionEntry('storeTradeRecommendation', { 
     crypto: recommendation.crypto, 
     action: recommendation.action,
-    entryPrice
+    entryPrice,
+    geminiModelUsed
   });
   
   try {
-    log('INFO', `Storing trade recommendation for ${recommendation.crypto}...`);
+    log('INFO', `Storing trade recommendation for ${recommendation.crypto} (model: ${geminiModelUsed})...`);
     
     // Set initial status to pending for new recommendations
     const initialStatus = 'pending';
@@ -60,6 +62,7 @@ export async function storeTradeRecommendation(
       risk_level: recommendation.riskLevel,
       entry_price: entryPrice,
       status: initialStatus,
+      gemini_model_used: geminiModelUsed,
       // Add signal tracking columns
       signal_mt_trend_aligned: signalAnalysis.signal_mt_trend_aligned,
       signal_volume_confirmed: signalAnalysis.signal_volume_confirmed,
@@ -96,7 +99,7 @@ export async function storeTradeRecommendation(
       affectedRows: 1
     });
     
-    log('INFO', `Successfully stored trade recommendation for ${recommendation.crypto} with initial status: ${initialStatus}`);
+    log('INFO', `Successfully stored trade recommendation for ${recommendation.crypto} with initial status: ${initialStatus} (model: ${geminiModelUsed})`);
     logFunctionExit('storeTradeRecommendation', true);
     endPerformanceTimer(timerId);
     return true;
@@ -402,6 +405,256 @@ export async function getEvaluationStats(): Promise<{
     return { total: 0, pending: 0, accurate: 0, inaccurate: 0, expired: 0, noEntryHit: 0, accuracyRate: 0 };
   }
 }
+
+// Function to get evaluation statistics grouped by Gemini model
+export async function getEvaluationStatsByModel(): Promise<{
+  [modelName: string]: {
+    total: number;
+    pending: number;
+    accurate: number;
+    inaccurate: number;
+    expired: number;
+    noEntryHit: number;
+    accuracyRate: number;
+  }
+}> {
+  const timerId = startPerformanceTimer('getEvaluationStatsByModel');
+  logFunctionEntry('getEvaluationStatsByModel');
+  
+  try {
+    logDatabaseOperation({
+      operation: 'SELECT',
+      table: 'trade_recommendations',
+      query: 'SELECT status, gemini_model_used FROM trade_recommendations'
+    });
+    
+    const { data, error } = await supabase
+      .from('trade_recommendations')
+      .select('status, gemini_model_used');
+
+    if (error) {
+      logDatabaseError('SELECT', 'trade_recommendations', error);
+      logFunctionExit('getEvaluationStatsByModel', {});
+      endPerformanceTimer(timerId);
+      return {};
+    }
+
+    logDatabaseOperation({
+      operation: 'SELECT',
+      table: 'trade_recommendations',
+      resultCount: data.length
+    });
+
+    // Group data by model
+    const modelStats: { [modelName: string]: any } = {};
+    
+    data.forEach(record => {
+      const modelName = record.gemini_model_used || 'unknown';
+      
+      if (!modelStats[modelName]) {
+        modelStats[modelName] = {
+          total: 0,
+          pending: 0,
+          accurate: 0,
+          inaccurate: 0,
+          expired: 0,
+          noEntryHit: 0,
+          accuracyRate: 0
+        };
+      }
+      
+      modelStats[modelName].total++;
+      
+      switch (record.status) {
+        case 'pending':
+          modelStats[modelName].pending++;
+          break;
+        case 'accurate':
+          modelStats[modelName].accurate++;
+          break;
+        case 'inaccurate':
+          modelStats[modelName].inaccurate++;
+          break;
+        case 'expired':
+          modelStats[modelName].expired++;
+          break;
+        case 'no_entry_hit':
+          modelStats[modelName].noEntryHit++;
+          break;
+      }
+    });
+
+    // Calculate accuracy rates
+    Object.keys(modelStats).forEach(modelName => {
+      const stats = modelStats[modelName];
+      const evaluated = stats.accurate + stats.inaccurate;
+      if (evaluated > 0) {
+        stats.accuracyRate = (stats.accurate / evaluated) * 100;
+      }
+    });
+
+    log('INFO', 'Model evaluation stats calculated', {
+      models: Object.keys(modelStats),
+      totalRecords: data.length
+    });
+    
+    logFunctionExit('getEvaluationStatsByModel', { modelCount: Object.keys(modelStats).length });
+    endPerformanceTimer(timerId);
+    return modelStats;
+  } catch (error) {
+    log('ERROR', 'Error calculating model evaluation stats', error);
+    logFunctionExit('getEvaluationStatsByModel', {});
+    endPerformanceTimer(timerId);
+    return {};
+  }
+}
+
+// Function to get confidence distribution by model
+export async function getConfidenceDistributionByModel(): Promise<{
+  [modelName: string]: {
+    '0-20': number;
+    '21-40': number;
+    '41-60': number;
+    '61-80': number;
+    '81-100': number;
+  }
+}> {
+  const timerId = startPerformanceTimer('getConfidenceDistributionByModel');
+  logFunctionEntry('getConfidenceDistributionByModel');
+  
+  try {
+    logDatabaseOperation({
+      operation: 'SELECT',
+      table: 'trade_recommendations',
+      query: 'SELECT confidence, gemini_model_used FROM trade_recommendations'
+    });
+    
+    const { data, error } = await supabase
+      .from('trade_recommendations')
+      .select('confidence, gemini_model_used');
+
+    if (error) {
+      logDatabaseError('SELECT', 'trade_recommendations', error);
+      logFunctionExit('getConfidenceDistributionByModel', {});
+      endPerformanceTimer(timerId);
+      return {};
+    }
+
+    logDatabaseOperation({
+      operation: 'SELECT',
+      table: 'trade_recommendations',
+      resultCount: data.length
+    });
+
+    // Group confidence scores by model
+    const modelDistribution: { [modelName: string]: any } = {};
+    
+    data.forEach(record => {
+      const modelName = record.gemini_model_used || 'unknown';
+      const confidence = record.confidence;
+      
+      if (!modelDistribution[modelName]) {
+        modelDistribution[modelName] = {
+          '0-20': 0,
+          '21-40': 0,
+          '41-60': 0,
+          '61-80': 0,
+          '81-100': 0
+        };
+      }
+      
+      if (confidence <= 20) modelDistribution[modelName]['0-20']++;
+      else if (confidence <= 40) modelDistribution[modelName]['21-40']++;
+      else if (confidence <= 60) modelDistribution[modelName]['41-60']++;
+      else if (confidence <= 80) modelDistribution[modelName]['61-80']++;
+      else modelDistribution[modelName]['81-100']++;
+    });
+
+    log('INFO', 'Confidence distribution by model calculated', {
+      models: Object.keys(modelDistribution),
+      totalRecords: data.length
+    });
+    
+    logFunctionExit('getConfidenceDistributionByModel', { modelCount: Object.keys(modelDistribution).length });
+    endPerformanceTimer(timerId);
+    return modelDistribution;
+  } catch (error) {
+    log('ERROR', 'Error calculating confidence distribution by model', error);
+    logFunctionExit('getConfidenceDistributionByModel', {});
+    endPerformanceTimer(timerId);
+    return {};
+  }
+}
+
+// Function to get risk level distribution by model
+export async function getRiskLevelDistributionByModel(): Promise<{
+  [modelName: string]: {
+    low: number;
+    medium: number;
+    high: number;
+  }
+}> {
+  const timerId = startPerformanceTimer('getRiskLevelDistributionByModel');
+  logFunctionEntry('getRiskLevelDistributionByModel');
+  
+  try {
+    logDatabaseOperation({
+      operation: 'SELECT',
+      table: 'trade_recommendations',
+      query: 'SELECT risk_level, gemini_model_used FROM trade_recommendations'
+    });
+    
+    const { data, error } = await supabase
+      .from('trade_recommendations')
+      .select('risk_level, gemini_model_used');
+
+    if (error) {
+      logDatabaseError('SELECT', 'trade_recommendations', error);
+      logFunctionExit('getRiskLevelDistributionByModel', {});
+      endPerformanceTimer(timerId);
+      return {};
+    }
+
+    logDatabaseOperation({
+      operation: 'SELECT',
+      table: 'trade_recommendations',
+      resultCount: data.length
+    });
+
+    // Group risk levels by model
+    const modelDistribution: { [modelName: string]: any } = {};
+    
+    data.forEach(record => {
+      const modelName = record.gemini_model_used || 'unknown';
+      const riskLevel = record.risk_level;
+      
+      if (!modelDistribution[modelName]) {
+        modelDistribution[modelName] = {
+          low: 0,
+          medium: 0,
+          high: 0
+        };
+      }
+      
+      modelDistribution[modelName][riskLevel]++;
+    });
+
+    log('INFO', 'Risk level distribution by model calculated', {
+      models: Object.keys(modelDistribution),
+      totalRecords: data.length
+    });
+    
+    logFunctionExit('getRiskLevelDistributionByModel', { modelCount: Object.keys(modelDistribution).length });
+    endPerformanceTimer(timerId);
+    return modelDistribution;
+  } catch (error) {
+    log('ERROR', 'Error calculating risk level distribution by model', error);
+    logFunctionExit('getRiskLevelDistributionByModel', {});
+    endPerformanceTimer(timerId);
+    return {};
+  }
+}
+
 // Function to get signal usage statistics
 export async function getSignalUsageStats(): Promise<SignalUsageStats> {
   const timerId = startPerformanceTimer('getSignalUsageStats');

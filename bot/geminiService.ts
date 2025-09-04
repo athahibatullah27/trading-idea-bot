@@ -28,11 +28,11 @@ log('INFO', 'Gemini Service Configuration:', {
 
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
+const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
 // OpenRouter configuration
 const OPENROUTER_API_BASE = 'https://openrouter.ai/api/v1';
-const OPENROUTER_MODEL = OPENROUTER_GEMINI_MODEL
+const OPENROUTER_MODEL = 'google/gemini-2.0-flash-exp:free';
 
 export interface DerivativesTradeIdea {
   direction: 'long' | 'short';
@@ -90,7 +90,7 @@ export async function generateGeminiRecommendations(
         'Authorization': '[REDACTED]'
       },
       body: {
-        model: OPENROUTER_MODEL,
+        model: 'gemini-2.0-flash-exp',
         promptLength: prompt.length,
         cryptoSymbols: cryptoData.map(c => c.symbol)
       },
