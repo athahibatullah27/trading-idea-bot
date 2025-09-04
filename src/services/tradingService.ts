@@ -58,16 +58,28 @@ export async function getEvaluatedRecommendationsFromAPI(): Promise<TradingRecom
     // Transform the data to match our frontend interface
     const recommendations = rawRecommendations.map((rec: any) => ({
       ...rec,
-      geminiModelUsed: rec.gemini_model_used || rec.geminiModelUsed // Convert snake_case to camelCase without fallback
+      geminiModelUsed: rec.gemini_model_used || rec.geminiModelUsed || null // Convert snake_case to camelCase
     }));
     
     console.log(`✅ Frontend: Successfully received ${recommendations.length} evaluated recommendations`);
-    console.log(`🔍 Frontend: Sample recommendation model data:`, {
-      raw_gemini_model_used: rawRecommendations[0]?.gemini_model_used,
-      transformed_geminiModelUsed: recommendations[0]?.geminiModelUsed,
-      raw_object_keys: Object.keys(rawRecommendations[0] || {}),
-      all_model_values: rawRecommendations.slice(0, 3).map((r: any) => r.gemini_model_used)
+    
+    // Debug: Check if gemini_model_used is in the API response
+    console.log(`🔍 Frontend: API Response Debug:`, {
+      firstRecordKeys: Object.keys(rawRecommendations[0] || {}),
+      hasGeminiModelUsed: 'gemini_model_used' in (rawRecommendations[0] || {}),
+      firstThreeModelValues: rawRecommendations.slice(0, 3).map((r: any) => ({
+        id: r.id?.substring(0, 8),
+        gemini_model_used: r.gemini_model_used,
+        symbol: r.symbol
+      }))
     });
+    
+    // Check if the backend is missing the gemini_model_used field
+    if (rawRecommendations.length > 0 && !('gemini_model_used' in rawRecommendations[0])) {
+      console.warn('⚠️ Frontend: Backend API is not returning gemini_model_used field!');
+      console.warn('🔧 Frontend: Check that the backend SELECT query includes gemini_model_used column');
+    }
+    
     console.log(`📊 Frontend: Recommendation statuses:`, {
       pending: recommendations.filter((r: TradingRecommendation) => r.status === 'pending').length,
       accurate: recommendations.filter((r: TradingRecommendation) => r.status === 'accurate').length,

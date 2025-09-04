@@ -253,13 +253,9 @@ export function TradingRecommendation({ recommendation }: TradingRecommendationP
           <div className="font-medium text-white">
             {(() => {
               const modelName = recommendation.geminiModelUsed || (recommendation as any).gemini_model_used;
-              console.log('🔍 Model name debug:', { 
-                geminiModelUsed: recommendation.geminiModelUsed, 
-                gemini_model_used: (recommendation as any).gemini_model_used,
-                final: modelName 
-              });
-              if (!modelName || modelName === 'Unknown' || modelName === 'unknown' || modelName === null) {
-                return 'Legacy (pre-tracking)';
+              
+              if (!modelName || modelName === null || modelName === undefined) {
+                return 'Missing from API';
               }
               return modelName;
             })()}
