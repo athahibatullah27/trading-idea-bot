@@ -11,7 +11,7 @@ on:
   #     - master # Trigger on pull requests targeting 'main'
   push:
     branches:
-      -  dashboard-enhancement # Trigger on pushes to the 'insert-branch-name' branch
+      -  openrouter # Trigger on pushes to the 'insert-branch-name' branch
 
 # Define one or more jobs
 jobs:

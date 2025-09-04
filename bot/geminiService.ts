@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import axios from 'axios';
 import { CryptoData, NewsItem, MarketConditions, TradingRecommendation } from './types.js';
 import { EnhancedDerivativesMarketData } from './types.js';
 import dotenv from 'dotenv';
@@ -17,6 +18,10 @@ dotenv.config();
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+
+// OpenRouter configuration
+const OPENROUTER_API_BASE = 'https://openrouter.ai/api/v1';
+const OPENROUTER_MODEL = 'google/gemini-2.0-flash-exp:free';
 
 export interface DerivativesTradeIdea {
   direction: 'long' | 'short';
@@ -115,16 +120,29 @@ export async function generateGeminiRecommendations(
     log('ERROR', 'Error generating Gemini recommendations', error.message);
     
     // Check if this is a quota/rate limit error
-    if (error.message && error.message.includes('429 Too Many Requests')) {
+    if (error.message && (error.message.includes('429') || error.message.includes('Too Many Requests') || error.message.includes('quota'))) {
       log('WARN', 'Gemini API quota exceeded - returning quota error indicator');
-      // Return a special error indicator that the calling code can detect
+      
+      try {
+        const fallbackRecommendations = await generateOpenRouterRecommendations(cryptoData, news, marketConditions, context);
+        if (fallbackRecommendations.length > 0) {
+          log('INFO', `Successfully generated ${fallbackRecommendations.length} recommendations using OpenRouter fallback`);
+          logFunctionExit('generateGeminiRecommendations', { count: fallbackRecommendations.length, source: 'openrouter' });
+          endPerformanceTimer(timerId);
+          return fallbackRecommendations;
+        }
+      } catch (fallbackError) {
+        log('ERROR', 'OpenRouter fallback also failed', fallbackError.message);
+      }
+      
+      // If both APIs fail, return quota exceeded indicator
       return [{ 
         crypto: 'QUOTA_EXCEEDED', 
         action: 'hold' as const,
         confidence: 0,
         targetPrice: 0,
         stopLoss: 0,
-        reasoning: ['Gemini API quota exceeded. Please try again later or upgrade your plan.'],
+        reasoning: ['Both Gemini and OpenRouter APIs are rate limited. Please try again later.'],
         timeframe: 'N/A',
         riskLevel: 'low' as const
       }];
@@ -435,9 +453,26 @@ export async function generateDerivativesTradeIdea(
     log('ERROR', 'Error generating derivatives trade idea', error.message);
     
     // Check if this is a quota/rate limit error
-    if (error.message && error.message.includes('429 Too Many Requests')) {
+    if (error.message && (error.message.includes('429') || error.message.includes('Too Many Requests') || error.message.includes('quota'))) {
       log('WARN', 'Gemini API quota exceeded for derivatives trade');
-      // Return a special error indicator
+      
+      try {
+        const fallbackTradeIdea = await generateOpenRouterDerivativesTradeIdea(marketData, context);
+        if (fallbackTradeIdea) {
+          log('INFO', `Successfully generated derivatives trade idea using OpenRouter fallback`);
+          logFunctionExit('generateDerivativesTradeIdea', { 
+            direction: fallbackTradeIdea.direction, 
+            confidence: fallbackTradeIdea.confidence,
+            source: 'openrouter'
+          });
+          endPerformanceTimer(timerId);
+          return fallbackTradeIdea;
+        }
+      } catch (fallbackError) {
+        log('ERROR', 'OpenRouter fallback also failed for derivatives trade', fallbackError.message);
+      }
+      
+      // If both APIs fail, return quota exceeded indicator
       return {
         direction: 'long' as const,
         entry: 0,
@@ -446,8 +481,8 @@ export async function generateDerivativesTradeIdea(
         riskReward: 0,
         confidence: 0,
         technicalReasoning: [
-          'Gemini API quota exceeded. You have reached the daily limit of 50 requests.',
-          'Please try again tomorrow or upgrade to a paid plan for higher limits.',
+          'Both Gemini and OpenRouter APIs are rate limited.',
+          'Please try again later or upgrade to a paid plan for higher limits.',
           'Visit https://ai.google.dev/gemini-api/docs/rate-limits for more information.'
         ],
         symbol: 'QUOTA_EXCEEDED',
@@ -894,7 +929,7 @@ function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivat
     const activatedSignals = Array.isArray(tradeData.activatedSignals) ? tradeData.activatedSignals : [];
     log('INFO', 'Activated signals from Gemini:', activatedSignals);
     
-    // Handle the new "no_trade_due_to_c\onflict" direction
+    // Handle the new "no_trade_due_to_conflict" direction
     if (tradeData.direction === 'no_trade_due_to_conflict') {
       log('WARN', 'AI determined no trade due to conflicting signals');
       logFunctionExit('parseDerivativesTradeResponse', { direction: 'no_trade' });
@@ -989,6 +1024,252 @@ function parseDerivativesTradeResponse(text: string, marketData: EnhancedDerivat
     log('ERROR', 'Error parsing derivatives trade response', error.message);
     log('ERROR', 'Raw response (first 500 chars):', text.substring(0, 500) + '...');
     logFunctionExit('parseDerivativesTradeResponse', null);
+    return null;
+  }
+}
+
+// OpenRouter fallback functions
+async function generateOpenRouterRecommendations(
+  cryptoData: CryptoData[],
+  news?: NewsItem[],
+  marketConditions?: MarketConditions,
+  context?: string
+): Promise<TradingRecommendation[]> {
+  const timerId = startPerformanceTimer('generateOpenRouterRecommendations');
+  logFunctionEntry('generateOpenRouterRecommendations', { 
+    cryptoCount: cryptoData.length, 
+    newsCount: news?.length || 0,
+    hasMarketConditions: !!marketConditions 
+  });
+  
+  try {
+    log('INFO', 'Generating AI recommendations using OpenRouter fallback...');
+    
+    if (!process.env.OPENROUTER_API_KEY) {
+      log('ERROR', 'OPENROUTER_API_KEY is not configured');
+      logFunctionExit('generateOpenRouterRecommendations', []);
+      endPerformanceTimer(timerId);
+      return [];
+    }
+
+    if (cryptoData.length === 0) {
+      log('ERROR', 'No crypto data provided for OpenRouter analysis');
+      logFunctionExit('generateOpenRouterRecommendations', []);
+      endPerformanceTimer(timerId);
+      return [];
+    }
+
+    // Construct the prompt for OpenRouter (same as Gemini)
+    const prompt = buildGeminiPrompt(cryptoData, news, marketConditions);
+    
+    log('INFO', 'Sending prompt to OpenRouter API...');
+    
+    // Log API request (without sensitive data)
+    logApiRequest({
+      endpoint: `${OPENROUTER_API_BASE}/chat/completions`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': '[REDACTED]'
+      },
+      body: {
+        model: OPENROUTER_MODEL,
+        promptLength: prompt.length,
+        cryptoSymbols: cryptoData.map(c => c.symbol)
+      },
+      context
+    });
+    
+    // Make request to OpenRouter
+    const response = await axios.post(`${OPENROUTER_API_BASE}/chat/completions`, {
+      model: OPENROUTER_MODEL,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: prompt
+            }
+          ]
+        }
+      ]
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`
+      },
+      timeout: 30000 // 30 second timeout for OpenRouter
+    });
+    
+    logApiResponse({
+      status: response.status,
+      data: {
+        responseLength: response.data?.choices?.[0]?.message?.content?.length || 0,
+        responsePreview: response.data?.choices?.[0]?.message?.content?.substring(0, 200) + '...'
+      },
+      context
+    });
+    
+    log('INFO', 'Received response from OpenRouter API');
+    
+    // Extract text from OpenRouter response format
+    const text = response.data?.choices?.[0]?.message?.content || '';
+    
+    if (!text) {
+      log('ERROR', 'No content received from OpenRouter API');
+      logFunctionExit('generateOpenRouterRecommendations', []);
+      endPerformanceTimer(timerId);
+      return [];
+    }
+    
+    const recommendations = parseGeminiResponse(text, cryptoData);
+    
+    if (recommendations.length === 0) {
+      log('ERROR', 'Failed to parse valid recommendations from OpenRouter');
+      logFunctionExit('generateOpenRouterRecommendations', []);
+      endPerformanceTimer(timerId);
+      return [];
+    }
+    
+    log('INFO', `Generated ${recommendations.length} AI recommendations via OpenRouter`);
+    logFunctionExit('generateOpenRouterRecommendations', { count: recommendations.length });
+    endPerformanceTimer(timerId);
+    return recommendations;
+    
+  } catch (error) {
+    log('ERROR', 'Error generating OpenRouter recommendations', error.message);
+    
+    logApiResponse({
+      status: error.response?.status || 500,
+      error: error.message,
+      context
+    });
+    
+    logFunctionExit('generateOpenRouterRecommendations', []);
+    endPerformanceTimer(timerId);
+    return [];
+  }
+}
+
+async function generateOpenRouterDerivativesTradeIdea(
+  marketData: EnhancedDerivativesMarketData,
+  context?: string
+): Promise<DerivativesTradeIdea | null> {
+  const timerId = startPerformanceTimer('generateOpenRouterDerivativesTradeIdea');
+  logFunctionEntry('generateOpenRouterDerivativesTradeIdea', { symbol: marketData.symbol });
+  
+  try {
+    log('INFO', `Generating derivatives trade idea for ${marketData.symbol} using OpenRouter...`);
+    
+    if (!process.env.OPENROUTER_API_KEY) {
+      log('ERROR', 'OPENROUTER_API_KEY is not configured');
+      logFunctionExit('generateOpenRouterDerivativesTradeIdea', null);
+      endPerformanceTimer(timerId);
+      return null;
+    }
+
+    // Construct the prompt for derivatives trade analysis (same as Gemini)
+    const prompt = buildEnhancedDerivativesTradePrompt(marketData);
+    
+    log('INFO', 'Sending derivatives trade prompt to OpenRouter API...');
+    
+    // Log API request (without sensitive data)
+    logApiRequest({
+      endpoint: `${OPENROUTER_API_BASE}/chat/completions`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': '[REDACTED]'
+      },
+      body: {
+        model: OPENROUTER_MODEL,
+        promptLength: prompt.length,
+        symbol: marketData.symbol,
+        timeframes: Object.keys(marketData.timeframes)
+      },
+      context
+    });
+    
+    // Make request to OpenRouter
+    const response = await axios.post(`${OPENROUTER_API_BASE}/chat/completions`, {
+      model: OPENROUTER_MODEL,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: prompt
+            }
+          ]
+        }
+      ]
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`
+      },
+      timeout: 30000 // 30 second timeout for OpenRouter
+    });
+    
+    // For promptcheck command, log the complete response
+    const text = response.data?.choices?.[0]?.message?.content || '';
+    if (context === 'promptcheck-debug') {
+      console.log('\n' + '='.repeat(80));
+      console.log('🔍 PROMPT CHECK: COMPLETE OPENROUTER RESPONSE');
+      console.log('='.repeat(80));
+      console.log(text);
+      console.log('='.repeat(80) + '\n');
+    }
+    
+    logApiResponse({
+      status: response.status,
+      data: {
+        responseLength: text.length,
+        responsePreview: text.substring(0, 200) + '...'
+      },
+      context
+    });
+    
+    log('INFO', 'Received derivatives trade response from OpenRouter API');
+    
+    if (!text) {
+      log('ERROR', 'No content received from OpenRouter API');
+      logFunctionExit('generateOpenRouterDerivativesTradeIdea', null);
+      endPerformanceTimer(timerId);
+      return null;
+    }
+    
+    // Parse the JSON response (same parser as Gemini)
+    const tradeIdea = parseDerivativesTradeResponse(text, marketData);
+    
+    if (!tradeIdea) {
+      log('ERROR', 'Failed to parse valid trade idea from OpenRouter');
+      logFunctionExit('generateOpenRouterDerivativesTradeIdea', null);
+      endPerformanceTimer(timerId);
+      return null;
+    }
+    
+    log('INFO', `Generated derivatives trade idea via OpenRouter: ${tradeIdea.direction.toUpperCase()} ${tradeIdea.symbol}`);
+    logFunctionExit('generateOpenRouterDerivativesTradeIdea', { 
+      direction: tradeIdea.direction, 
+      confidence: tradeIdea.confidence 
+    });
+    endPerformanceTimer(timerId);
+    return tradeIdea;
+    
+  } catch (error) {
+    log('ERROR', 'Error generating OpenRouter derivatives trade idea', error.message);
+    
+    logApiResponse({
+      status: error.response?.status || 500,
+      error: error.message,
+      context
+    });
+    
+    logFunctionExit('generateOpenRouterDerivativesTradeIdea', null);
+    endPerformanceTimer(timerId);
     return null;
   }
 }
