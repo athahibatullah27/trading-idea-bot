@@ -15,13 +15,24 @@ import {
 
 dotenv.config();
 
+// Load model configurations from environment variables
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+const OPENROUTER_GEMINI_MODEL = process.env.OPENROUTER_GEMINI_MODEL || 'google/gemini-2.0-flash-exp:free';
+
+log('INFO', 'Gemini Service Configuration:', {
+  primaryModel: GEMINI_MODEL,
+  openRouterModel: OPENROUTER_GEMINI_MODEL,
+  hasGeminiKey: !!process.env.GEMINI_API_KEY,
+  hasOpenRouterKey: !!process.env.OPENROUTER_API_KEY
+});
+
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
 
 // OpenRouter configuration
 const OPENROUTER_API_BASE = 'https://openrouter.ai/api/v1';
-const OPENROUTER_MODEL = 'google/gemini-2.0-flash-exp:free';
+const OPENROUTER_MODEL = OPENROUTER_GEMINI_MODEL
 
 export interface DerivativesTradeIdea {
   direction: 'long' | 'short';
@@ -79,7 +90,7 @@ export async function generateGeminiRecommendations(
         'Authorization': '[REDACTED]'
       },
       body: {
-        model: 'gemini-2.0-flash-exp',
+        model: OPENROUTER_MODEL,
         promptLength: prompt.length,
         cryptoSymbols: cryptoData.map(c => c.symbol)
       },
@@ -388,7 +399,7 @@ export async function generateDerivativesTradeIdea(
     const prompt = buildEnhancedDerivativesTradePrompt(marketData);
     
     log('INFO', 'Sending derivatives trade prompt to Gemini API...');
-    
+    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
     // Log API request (without sensitive data)
     logApiRequest({
       endpoint: 'Gemini AI API (Derivatives)',
@@ -398,7 +409,7 @@ export async function generateDerivativesTradeIdea(
         'Authorization': '[REDACTED]'
       },
       body: {
-        model: 'gemini-2.0-flash-exp',
+        model: GEMINI_MODEL,
         promptLength: prompt.length,
         symbol: marketData.symbol,
         timeframes: Object.keys(marketData.timeframes)
@@ -1183,7 +1194,7 @@ async function generateOpenRouterDerivativesTradeIdea(
         'Authorization': '[REDACTED]'
       },
       body: {
-        model: OPENROUTER_MODEL,
+        model: OPENROUTER_GEMINI_MODEL,
         promptLength: prompt.length,
         symbol: marketData.symbol,
         timeframes: Object.keys(marketData.timeframes)
@@ -1193,7 +1204,7 @@ async function generateOpenRouterDerivativesTradeIdea(
     
     // Make request to OpenRouter
     const response = await axios.post(`${OPENROUTER_API_BASE}/chat/completions`, {
-      model: OPENROUTER_MODEL,
+      model: OPENROUTER_GEMINI_MODEL,
       messages: [
         {
           role: 'user',
