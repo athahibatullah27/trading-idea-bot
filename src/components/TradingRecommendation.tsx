@@ -250,7 +250,20 @@ export function TradingRecommendation({ recommendation }: TradingRecommendationP
         {/* Tooltip */}
         <div className="absolute bottom-full right-0 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap border border-gray-600 z-50">
           <div className="text-gray-300 text-xs">Model:</div>
-          <div className="font-medium text-white">{recommendation.geminiModelUsed || recommendation.gemini_model_used || 'Not specified'}</div>
+          <div className="font-medium text-white">
+            {(() => {
+              const modelName = recommendation.geminiModelUsed || (recommendation as any).gemini_model_used;
+              console.log('🔍 Model name debug:', { 
+                geminiModelUsed: recommendation.geminiModelUsed, 
+                gemini_model_used: (recommendation as any).gemini_model_used,
+                final: modelName 
+              });
+              if (!modelName || modelName === 'Unknown' || modelName === 'unknown' || modelName === null) {
+                return 'Legacy (pre-tracking)';
+              }
+              return modelName;
+            })()}
+          </div>
           {/* Tooltip arrow */}
           <div className="absolute top-full right-3 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-600"></div>
         </div>
