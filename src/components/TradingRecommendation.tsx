@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, TrendingDown, Minus, Target, Shield, Clock, AlertTriangle, CheckCircle, XCircle, Timer, Archive, Ban } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Target, Shield, Clock, AlertTriangle, CheckCircle, XCircle, Timer, Archive, Ban, Cpu } from 'lucide-react';
 import { TradingRecommendation as TradingRecommendationType } from '../types/trading';
 
 interface TradingRecommendationProps {
@@ -257,6 +257,13 @@ export function TradingRecommendation({ recommendation }: TradingRecommendationP
                 {getStatusIcon()}
                 <span className="hidden sm:inline">{getStatusText()}</span>
               </div>
+              {(recommendation as any).gemini_model_used && (
+                <div className="inline-flex items-center space-x-1 px-2 py-1 rounded-full border border-purple-400/20 bg-purple-400/10 text-purple-400 text-xs font-medium">
+                  <Cpu className="w-3 h-3" />
+                  <span className="hidden sm:inline">{(recommendation as any).gemini_model_used}</span>
+                  <span className="sm:hidden">AI</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
