@@ -10,6 +10,9 @@ services:
       - DISCORD_CLIENT_ID
       - DISCORD_GUILD_ID
       - GEMINI_API_KEY
+      - GEMINI_MODEL
+      - OPENROUTER_GEMINI_MODEL
+      - OPENROUTER_API_KEY
       - API_PORT
     env_file:
       - .env.backend
