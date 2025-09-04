@@ -14,7 +14,7 @@ export interface TradingRecommendation {
   entryPrice?: number;
   evaluationTimestamp?: string;
   createdAt?: string;
-  gemini_model_used?: string;
+  geminiModelUsed?: string;
 }
 
 export interface CryptoData {

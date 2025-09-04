@@ -53,7 +53,13 @@ export async function getEvaluatedRecommendationsFromAPI(): Promise<TradingRecom
       throw new Error(errorData.error || `HTTP ${response.status} ${response.statusText}`);
     }
     
-    const recommendations = await response.json();
+    const rawRecommendations = await response.json();
+    
+    // Transform the data to match our frontend interface
+    const recommendations = rawRecommendations.map((rec: any) => ({
+      ...rec,
+      geminiModelUsed: rec.gemini_model_used // Convert snake_case to camelCase
+    }));
     
     console.log(`✅ Frontend: Successfully received ${recommendations.length} evaluated recommendations`);
     console.log(`📊 Frontend: Recommendation statuses:`, {
