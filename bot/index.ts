@@ -279,7 +279,7 @@ app.get('/api/evaluated-recommendations', async (req, res) => {
     
     const { data: recommendations, error } = await supabase
       .from('trade_recommendations')
-      .select('*')
+      .select('*, gemini_model_used')
       .order('created_at', { ascending: false })
       .limit(50); // Limit to last 50 recommendations
 
