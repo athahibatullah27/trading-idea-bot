@@ -1098,7 +1098,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             
             // Store in Supabase with entry price
             const currentPrice = marketData.timeframes['1h'].indicators.currentPrice;
-            const stored = await storeTradeRecommendation(mappedRecommendation, tradeIdea.entry, OPENROUTER_GEMINI_MODEL);
+            const stored = await storeTradeRecommendation(mappedRecommendation, tradeIdea.entry, GEMINI_MODEL);
             
           } catch (storeError) {
             log('ERROR', 'Error storing derivatives trade idea', storeError);
