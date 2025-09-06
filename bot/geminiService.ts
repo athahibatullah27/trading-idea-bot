@@ -804,6 +804,7 @@ DATA:
       ).join(', ')}],
       "BTC Data Timestamp": "${btcContext.dataTimestamp}"
     },
+    "MARKET DATA": {
       "Funding Rate": ${market.fundingRate.toFixed(3)}
     }
 }
@@ -1191,7 +1192,16 @@ async function generateOpenRouterDerivativesTradeIdea(
     // Construct the prompt for derivatives trade analysis (same as Gemini)
     const prompt = buildEnhancedDerivativesTradePrompt(marketData);
     
+    // Truncate prompt if it's too long for OpenRouter (max ~8000 tokens ≈ 32000 chars)
+    const maxPromptLength = 30000;
+    const truncatedPrompt = prompt.length > maxPromptLength 
+      ? prompt.substring(0, maxPromptLength) + '\n\n[PROMPT TRUNCATED - PLEASE PROVIDE ANALYSIS BASED ON AVAILABLE DATA]'
+      : prompt;
+    
     log('INFO', 'Sending derivatives trade prompt to OpenRouter API...');
+    
+    // Use the correct OpenRouter model identifier
+    const openRouterModel = process.env.OPENROUTER_GEMINI_MODEL || 'google/gemini-2.0-flash-exp:free';
     
     // Log API request (without sensitive data)
     logApiRequest({
@@ -1203,16 +1213,16 @@ async function generateOpenRouterDerivativesTradeIdea(
       },
       body: {
         model: OPENROUTER_GEMINI_MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 4000,
-        temperature: 0.1
+        promptLength: truncatedPrompt.length,
+        symbol: marketData.symbol,
+        timeframes: Object.keys(marketData.timeframes)
       },
       context
     });
     
     // Make request to OpenRouter
     const response = await axios.post(`${OPENROUTER_API_BASE}/chat/completions`, {
-      model: OPENROUTER_GEMINI_MODEL,
+      model: openRouterModel,
       messages: [
         {
           role: 'user',
@@ -1223,11 +1233,19 @@ async function generateOpenRouterDerivativesTradeIdea(
             }
           ]
         }
-      ]
+      ],
+      max_tokens: 3000, // Reduced to ensure response fits
+      temperature: 0.1,
+      top_p: 1,
+      frequency_penalty: 0,
+      presence_penalty: 0
     }, {
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'HTTP-Referer': 'https://localhost:3001', // Use your actual domain
+        'X-Title': 'Crypto Trading Bot',
+        'User-Agent': 'CryptoTrader-Bot/1.0'
       },
       timeout: 30000 // 30 second timeout for OpenRouter
     });
@@ -1246,7 +1264,8 @@ async function generateOpenRouterDerivativesTradeIdea(
       status: response.status,
       data: {
         responseLength: text.length,
-        responsePreview: text.substring(0, 200) + '...'
+        responsePreview: text.substring(0, 200) + '...',
+        usage: response.data?.usage
       },
       context
     });
@@ -1281,9 +1300,33 @@ async function generateOpenRouterDerivativesTradeIdea(
   } catch (error) {
     log('ERROR', 'Error generating OpenRouter derivatives trade idea', error.message);
     
+    // Check if response has the expected structure
+    if (!error.response?.data || !error.response?.data.choices || !error.response?.data.choices[0] || !error.response?.data.choices[0].message) {
+      log('ERROR', 'Invalid OpenRouter API response structure', error.response?.data);
+      logFunctionExit('generateOpenRouterDerivativesTradeIdea', null);
+      endPerformanceTimer(timerId);
+      return null;
+    }
+    
+    // Log more detailed error information
+    if (error.response) {
+      log('ERROR', 'OpenRouter API error details:', {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data,
+        headers: error.response.headers
+      });
+    } else if (error.request) {
+      log('ERROR', 'OpenRouter API request failed:', {
+        url: error.config?.url,
+        method: error.config?.method,
+        timeout: error.config?.timeout
+      });
+    }
+    
     logApiResponse({
       status: error.response?.status || 500,
-      error: error.message,
+      error: error.response?.data || error.message,
       context
     });
     

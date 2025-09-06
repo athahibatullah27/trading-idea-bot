@@ -15,14 +15,14 @@ import { generateDerivativesTradeIdea, DerivativesTradeIdea } from './geminiServ
 import { buildEnhancedDerivativesTradePrompt } from './geminiService.js';
 import { supabase } from './supabaseClient.js';
 import { storeTradeRecommendation, evaluatePendingRecommendations, getEvaluationStats } from './evaluationService.js';
-import {
-  logApiRequest,
-  logApiResponse,
-  logDatabaseOperation,
+import { 
+  logApiRequest, 
+  logApiResponse, 
+  logDatabaseOperation, 
   logDatabaseError,
-  logDiscordInteraction,
-  startPerformanceTimer,
-  endPerformanceTimer,
+  logDiscordInteraction, 
+  startPerformanceTimer, 
+  endPerformanceTimer, 
   logAppState,
   logFunctionEntry,
   logFunctionExit,
@@ -65,7 +65,7 @@ app.get('/api/crypto-data', async (req, res) => {
     params: req.query as Record<string, any>,
     headers: req.headers
   });
-
+  
   try {
     const { symbol } = req.query;
     if (!symbol) {
@@ -100,7 +100,7 @@ app.get('/api/multiple-crypto-data', async (req, res) => {
     params: req.query as Record<string, any>,
     headers: req.headers
   });
-
+  
   try {
     const { symbols } = req.query;
     if (!symbols) {
@@ -130,7 +130,7 @@ app.get('/api/test-connection', async (req, res) => {
     method: 'GET',
     headers: req.headers
   });
-
+  
   try {
     const isConnected = await testAPIConnection();
     logApiResponse({ status: 200, data: { connected: isConnected }, context: 'test connection' });
@@ -152,40 +152,40 @@ app.get('/api/gemini-recommendations', async (req, res) => {
     method: 'GET',
     headers: req.headers
   });
-
+  
   try {
     logFunctionEntry('generateGeminiRecommendations');
-
+    
     // Fetch latest crypto data
     const symbols = ['BTC', 'ETH', 'SOL', 'ADA'];
     const cryptoData = await getMultipleCryptoData(symbols, 'gemini recommendations');
-
+    
     if (cryptoData.length === 0) {
-      logApiResponse({
-        status: 503,
-        data: {
+      logApiResponse({ 
+        status: 503, 
+        data: { 
           error: 'Unable to fetch market data for analysis. Please try again later.',
           userMessage: 'Market data is currently unavailable. Please check back in a few minutes.'
         },
         context: 'gemini recommendations'
       });
       endPerformanceTimer(timerId);
-      return res.status(503).json({
+      return res.status(503).json({ 
         error: 'Unable to fetch market data for analysis. Please try again later.',
         userMessage: 'Market data is currently unavailable. Please check back in a few minutes.'
       });
     }
-
+    
     // Fetch real-time news from CoinDesk
     log('INFO', 'Fetching real-time news from CryptoCompare...');
-    const realTimeNews = await fetchCoinDeskNews(5, 'gemini recommendations');
-
+    const realTimeNews = await fetchCoinDeskNews(5, 'gemini recommendations'); 
+    
     if (realTimeNews.length > 0) {
       log('INFO', `Using ${realTimeNews.length} real-time news articles from CryptoCompare`);
     } else {
       log('WARN', 'CryptoCompare API unavailable, proceeding without news data');
     }
-
+    
     // Generate recommendations using Gemini
     const recommendations = await generateGeminiRecommendations(
       cryptoData,
@@ -193,7 +193,7 @@ app.get('/api/gemini-recommendations', async (req, res) => {
       undefined,   // No market conditions (removed mock data)
       'gemini recommendations'
     );
-
+    
     // Check if we got a quota exceeded error
     if (recommendations.length === 1 && recommendations[0].crypto === 'QUOTA_EXCEEDED') {
       const quotaEmbed = new EmbedBuilder()
@@ -211,23 +211,23 @@ app.get('/api/gemini-recommendations', async (req, res) => {
       // await interaction.editReply({ embeds: [quotaEmbed] });
       return;
     }
-
+    
     if (recommendations.length === 0) {
-      logApiResponse({
-        status: 503,
-        data: {
+      logApiResponse({ 
+        status: 503, 
+        data: { 
           error: 'AI analysis service is temporarily unavailable. Please try again later.',
           userMessage: 'Our AI trading analysis is currently unavailable. This could be due to high demand or maintenance. Please try again in a few minutes.'
         },
         context: 'gemini recommendations'
       });
       endPerformanceTimer(timerId);
-      return res.status(503).json({
+      return res.status(503).json({ 
         error: 'AI analysis service is temporarily unavailable. Please try again later.',
         userMessage: 'Our AI trading analysis is currently unavailable. This could be due to high demand or maintenance. Please try again in a few minutes.'
       });
     }
-
+    
     // Store recommendations in Supabase with current prices as entry prices
     log('INFO', 'Storing recommendations in Supabase...', { count: recommendations.length });
     for (const recommendation of recommendations) {
@@ -235,24 +235,24 @@ app.get('/api/gemini-recommendations', async (req, res) => {
       const entryPrice = cryptoData?.price || recommendation.targetPrice;
       await storeTradeRecommendation(recommendation, entryPrice, GEMINI_MODEL);
     }
-
+    
     log('INFO', `Successfully generated ${recommendations.length} Gemini recommendations`);
     logFunctionExit('generateGeminiRecommendations', { count: recommendations.length });
     logApiResponse({ status: 200, data: recommendations, context: 'gemini recommendations' });
     res.json(recommendations);
-
+    
   } catch (error) {
     console.error('Gemini recommendations error:', error);
-    logApiResponse({
-      status: 500,
+    logApiResponse({ 
+      status: 500, 
       error,
-      data: {
+      data: { 
         error: 'AI analysis service encountered an error. Please try again later.',
         userMessage: 'We encountered an issue while analyzing the market. Please try again in a few minutes.'
       },
       context: 'gemini recommendations'
     });
-    res.status(500).json({
+    res.status(500).json({ 
       error: 'AI analysis service encountered an error. Please try again later.',
       userMessage: 'We encountered an issue while analyzing the market. Please try again in a few minutes.'
     });
@@ -269,14 +269,14 @@ app.get('/api/evaluated-recommendations', async (req, res) => {
     method: 'GET',
     headers: req.headers
   });
-
+  
   try {
     logFunctionEntry('fetchEvaluatedRecommendations');
     logDatabaseOperation({
       operation: 'SELECT',
       table: 'trade_recommendations'
     });
-
+    
     const { data: recommendations, error } = await supabase
       .from('trade_recommendations')
       .select('*, gemini_model_used')
@@ -311,7 +311,7 @@ app.get('/api/evaluated-recommendations', async (req, res) => {
       entryPrice: rec.entry_price ? parseFloat(rec.entry_price) : null,
       evaluationTimestamp: rec.evaluation_timestamp,
       createdAt: rec.created_at,
-      geminiModelUsed: rec.gemini_model_used
+      geminiModelUsed: rec.gemini_model_used  
     }));
 
 
@@ -319,7 +319,7 @@ app.get('/api/evaluated-recommendations', async (req, res) => {
     logFunctionExit('fetchEvaluatedRecommendations', { count: transformedRecommendations.length });
     logApiResponse({ status: 200, data: transformedRecommendations, context: 'evaluation' });
     res.json(transformedRecommendations);
-
+    
   } catch (error) {
     log('ERROR', 'Error fetching evaluated recommendations', error);
     logApiResponse({ status: 500, error, data: { error: 'Internal server error' }, context: 'evaluation' });
@@ -349,7 +349,7 @@ app.get('/api/evaluation-stats', async (req, res) => {
     method: 'GET',
     headers: req.headers
   });
-
+  
   try {
     logFunctionEntry('getEvaluationStats');
     const stats = await getEvaluationStats();
@@ -415,18 +415,18 @@ const client = new Client({
 
 // Bot ready event
 client.once(Events.ClientReady, (readyClient) => {
-  logAppState('STARTUP', {
+  logAppState('STARTUP', { 
     message: `Discord bot is ready! Logged in as ${readyClient.user.tag}`,
-    data: {
+    data: { 
       username: readyClient.user.tag,
       serverCount: readyClient.guilds.cache.size,
       userId: readyClient.user.id
     }
   });
-
+  
   // Register slash commands
   registerSlashCommands();
-
+  
   // Test API connection on startup
   testAPIConnection().then(isConnected => {
     if (isConnected) {
@@ -435,7 +435,7 @@ client.once(Events.ClientReady, (readyClient) => {
       logAppState('STARTUP', { message: 'Real-time data APIs are not available, using fallback data' });
     }
   });
-
+  
   // Test CoinDesk News API on startup
   testCoinDeskAPI().then(isConnected => {
     if (isConnected) {
@@ -444,7 +444,7 @@ client.once(Events.ClientReady, (readyClient) => {
       logAppState('STARTUP', { message: 'CryptoCompare News API is not available, using fallback news' });
     }
   });
-
+  
   // Test Binance Futures API on startup
   testBinanceFuturesAPI().then(isConnected => {
     if (isConnected) {
@@ -453,23 +453,23 @@ client.once(Events.ClientReady, (readyClient) => {
       logAppState('STARTUP', { message: 'Binance Futures API is not available' });
     }
   });
-
+  
   // Test Supabase connection on startup
   supabase.from('trade_recommendations').select('count', { count: 'exact', head: true }).then(({ error, count }) => {
     if (error) {
       logAppState('STARTUP', { message: 'Supabase connection failed', error });
     } else {
-      logAppState('STARTUP', {
+      logAppState('STARTUP', { 
         message: `Supabase connected successfully. Found ${count || 0} trade recommendations.`,
         data: { recommendationCount: count || 0 }
       });
     }
   });
-
+  
   // Start evaluation scheduler at specific UTC hours (03:00, 07:00, 11:00, 15:00, 19:00, 23:00)
   logAppState('STARTUP', { message: 'Starting trade recommendation evaluation scheduler at specific UTC hours...' });
   scheduleEvaluationAtSpecificHours();
-
+  
   // Set bot status
   client.user?.setActivity('crypto markets 📈', { type: 3 }); // 3 = Watching
 });
@@ -480,29 +480,29 @@ function calculateNextEvaluationDelay(): number {
   const currentUTCHour = now.getUTCHours();
   const currentUTCMinute = now.getUTCMinutes();
   const currentUTCSecond = now.getUTCSeconds();
-
+  
   // Target evaluation hours in UTC
   const evaluationHours = [0, 4, 8, 12, 16, 20];
-
+  
   // Find the next evaluation hour
   let nextHour = evaluationHours.find(hour => hour > currentUTCHour);
-
+  
   // If no hour found today, use the first hour of tomorrow
   if (!nextHour) {
     nextHour = evaluationHours[0]; // 03:00 UTC next day
   }
-
+  
   // Calculate target time
   const targetTime = new Date(now);
   targetTime.setUTCHours(nextHour, 0, 0, 0); // Set to target hour, 0 minutes, 0 seconds, 0 milliseconds
-
+  
   // If target time is in the past (shouldn't happen with our logic, but safety check)
   if (targetTime <= now) {
     targetTime.setUTCDate(targetTime.getUTCDate() + 1);
   }
-
+  
   const delayMs = targetTime.getTime() - now.getTime();
-
+  
   logAppState('CONFIG', {
     message: 'Evaluation scheduler configuration',
     data: {
@@ -511,25 +511,25 @@ function calculateNextEvaluationDelay(): number {
       delayMinutes: Math.round(delayMs / 1000 / 60)
     }
   });
-
+  
   return delayMs;
 }
 
 // Function to schedule evaluations at specific UTC hours
 function scheduleEvaluationAtSpecificHours(): void {
   const initialDelay = calculateNextEvaluationDelay();
-
+  
   // Schedule the first evaluation
   setTimeout(() => {
     log('INFO', 'Running scheduled evaluation at UTC hour...');
     evaluatePendingRecommendations();
-
+    
     // After the first evaluation, set up recurring evaluations every 4 hours
     setInterval(() => {
       log('INFO', 'Running scheduled evaluation (4-hour interval)...');
       evaluatePendingRecommendations();
     }, 4 * 60 * 60 * 1000); // 4 hours in milliseconds
-
+    
   }, initialDelay);
 }
 
@@ -537,27 +537,27 @@ function scheduleEvaluationAtSpecificHours(): void {
 async function registerSlashCommands() {
   try {
     logAppState('STARTUP', { message: 'Started refreshing application (/) commands.' });
-
+    
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN!);
-
+    
     const clientId = process.env.DISCORD_CLIENT_ID;
     const guildId = process.env.DISCORD_GUILD_ID;
-
+    
     if (!clientId) {
       logAppState('ERROR', { message: 'DISCORD_CLIENT_ID is not set in .env file' });
       return;
     }
-
+    
     // Convert commands to JSON
     const commandsData = commands.map(command => command.toJSON());
-
+    
     if (guildId) {
       // Register commands for a specific guild (faster for development)
       await rest.put(
         Routes.applicationGuildCommands(clientId, guildId),
         { body: commandsData }
       );
-      logAppState('STARTUP', {
+      logAppState('STARTUP', { 
         message: `Successfully registered ${commandsData.length} guild commands for server ${guildId}`,
         data: { commandCount: commandsData.length, guildId }
       });
@@ -567,7 +567,7 @@ async function registerSlashCommands() {
         Routes.applicationCommands(clientId),
         { body: commandsData }
       );
-      logAppState('STARTUP', {
+      logAppState('STARTUP', { 
         message: `Successfully registered ${commandsData.length} global commands`,
         data: { commandCount: commandsData.length }
       });
@@ -583,19 +583,19 @@ const processedInteractions = new Set<string>();
 // Handle slash command interactions
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
-
+  
   // Create a unique key for this interaction to prevent duplicate processing
   const interactionKey = `${interaction.id}-${interaction.commandName}`;
-
+  
   // Check if we've already processed this interaction
   if (processedInteractions.has(interactionKey)) {
     log('WARN', `Duplicate interaction detected for ${interaction.commandName}, skipping...`);
     return;
   }
-
+  
   // Mark this interaction as processed
   processedInteractions.add(interactionKey);
-
+  
   // Clean up old processed interactions (keep only last 100)
   if (processedInteractions.size > 100) {
     const oldestKey = processedInteractions.values().next().value;
@@ -618,32 +618,32 @@ client.on(Events.InteractionCreate, async (interaction) => {
   try {
     if (interaction.commandName === 'tradingidea') {
       const timerId = startPerformanceTimer('tradingidea-command');
-
+      
       // Show initial loading message
-      logDiscordInteraction('EDIT_REPLY', {
-        commandName: interaction.commandName,
-        message: 'Generating AI-powered trading recommendations...'
+      logDiscordInteraction('EDIT_REPLY', { 
+        commandName: interaction.commandName, 
+        message: 'Generating AI-powered trading recommendations...' 
       });
       await interaction.editReply('🔄 **Generating AI-powered trading recommendations...**\n*This may take a moment while I analyze the markets*');
-
+      
       try {
         // Fetch recommendations from our API
         const response = await axios.get('http://localhost:3001/api/gemini-recommendations', {
           timeout: 30000 // 30 second timeout
         });
-
+        
         const recommendations = response.data;
-
+        
         if (!recommendations || recommendations.length === 0) {
-          logDiscordInteraction('EDIT_REPLY', {
-            commandName: interaction.commandName,
-            message: 'No trading recommendations available at the moment.'
+          logDiscordInteraction('EDIT_REPLY', { 
+            commandName: interaction.commandName, 
+            message: 'No trading recommendations available at the moment.' 
           });
           await interaction.editReply('❌ **No trading recommendations available at the moment.**\n*Please try again in a few minutes.*');
           endPerformanceTimer(timerId);
           return;
         }
-
+        
         // Check if this is a quota exceeded response
         if (recommendations.length === 1 && recommendations[0].crypto === 'QUOTA_EXCEEDED') {
           const quotaEmbed = new EmbedBuilder()
@@ -662,17 +662,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
           await interaction.editReply({ embeds: [quotaEmbed] });
           return;
         }
-
+        
         // Update with success message
-        logDiscordInteraction('EDIT_REPLY', {
-          commandName: interaction.commandName,
-          message: `Generated ${recommendations.length} AI trading recommendations!`
+        logDiscordInteraction('EDIT_REPLY', { 
+          commandName: interaction.commandName, 
+          message: `Generated ${recommendations.length} AI trading recommendations!` 
         });
         await interaction.editReply(`✅ **Generated ${recommendations.length} AI trading recommendations!**`);
-
+        
         // Create embeds for each recommendation
         const embeds = recommendations.map(recommendation => createRecommendationEmbed(recommendation));
-
+        
         // Send each recommendation as a separate embed
         for (const recommendation of recommendations) {
           await storeTradeRecommendation(recommendation, recommendation.targetPrice, GEMINI_MODEL);
@@ -683,25 +683,25 @@ client.on(Events.InteractionCreate, async (interaction) => {
           message: `Recommendation for ${recommendations[0]?.crypto || 'crypto'}`
         });
         await interaction.followUp({ embeds: embeds });
-
+        
         endPerformanceTimer(timerId);
       } catch (apiError: any) {
-        logDiscordInteraction('ERROR', {
-          commandName: interaction.commandName,
-          error: apiError
+        logDiscordInteraction('ERROR', { 
+          commandName: interaction.commandName, 
+          error: apiError 
         });
-
+        
         // Check if it's a user-friendly error from our API
         if (apiError.response?.data?.userMessage) {
-          logDiscordInteraction('EDIT_REPLY', {
-            commandName: interaction.commandName,
-            message: apiError.response.data.userMessage
+          logDiscordInteraction('EDIT_REPLY', { 
+            commandName: interaction.commandName, 
+            message: apiError.response.data.userMessage 
           });
           await interaction.editReply(`❌ **${apiError.response.data.userMessage}**`);
         } else {
-          logDiscordInteraction('EDIT_REPLY', {
-            commandName: interaction.commandName,
-            message: 'Unable to generate recommendations at the moment.'
+          logDiscordInteraction('EDIT_REPLY', { 
+            commandName: interaction.commandName, 
+            message: 'Unable to generate recommendations at the moment.' 
           });
           await interaction.editReply('❌ **Unable to generate recommendations at the moment.**\n*Our AI analysis service may be experiencing high demand. Please try again in a few minutes.*');
         }
@@ -709,31 +709,31 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
       return;
     }
-
+    
     if (interaction.commandName === 'market') {
       const timerId = startPerformanceTimer('market-command');
-      logDiscordInteraction('EDIT_REPLY', {
-        commandName: interaction.commandName,
-        message: 'Fetching real-time market data...'
+      logDiscordInteraction('EDIT_REPLY', { 
+        commandName: interaction.commandName, 
+        message: 'Fetching real-time market data...' 
       });
       await interaction.editReply('🔄 **Fetching real-time market data...**');
-
+      
       try {
         const marketEmbed = await createMarketOverviewEmbed();
-        logDiscordInteraction('EDIT_REPLY', {
-          commandName: interaction.commandName,
-          message: 'Market overview ready!'
+        logDiscordInteraction('EDIT_REPLY', { 
+          commandName: interaction.commandName, 
+          message: 'Market overview ready!' 
         });
         await interaction.editReply('✅ **Market overview ready!**');
-        logDiscordInteraction('FOLLOW_UP', {
-          commandName: interaction.commandName,
-          message: 'Market overview embed'
+        logDiscordInteraction('FOLLOW_UP', { 
+          commandName: interaction.commandName, 
+          message: 'Market overview embed' 
         });
         await interaction.followUp({ embeds: [marketEmbed] });
       } catch (error) {
-        logDiscordInteraction('ERROR', {
-          commandName: interaction.commandName,
-          error
+        logDiscordInteraction('ERROR', { 
+          commandName: interaction.commandName, 
+          error 
         });
         await interaction.editReply('❌ **Unable to fetch market data at the moment. Please try again later.**');
       } finally {
@@ -741,86 +741,86 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
       return;
     }
-
+    
     if (interaction.commandName === 'crypto') {
       const timerId = startPerformanceTimer('crypto-command');
       const symbol = interaction.options.getString('symbol')?.toUpperCase();
       if (!symbol) {
-        logDiscordInteraction('EDIT_REPLY', {
-          commandName: interaction.commandName,
-          message: 'Please provide a valid cryptocurrency symbol.'
+        logDiscordInteraction('EDIT_REPLY', { 
+          commandName: interaction.commandName, 
+          message: 'Please provide a valid cryptocurrency symbol.' 
         });
         await interaction.editReply('❌ Please provide a valid cryptocurrency symbol.');
         endPerformanceTimer(timerId);
         return;
       }
-
+      
       // Show loading message
-      logDiscordInteraction('EDIT_REPLY', {
-        commandName: interaction.commandName,
-        message: `Fetching live ${symbol} data...`
+      logDiscordInteraction('EDIT_REPLY', { 
+        commandName: interaction.commandName, 
+        message: `Fetching live ${symbol} data...` 
       });
       await interaction.editReply(`🔄 **Fetching live ${symbol} data...**`);
-
+      
       try {
         const realTimeCrypto = await getRealTimeCryptoData(symbol);
-
+        
         if (realTimeCrypto && realTimeCrypto.price > 0) {
-          logDiscordInteraction('EDIT_REPLY', {
-            commandName: interaction.commandName,
-            message: `Live ${symbol} analysis ready!`
+          logDiscordInteraction('EDIT_REPLY', { 
+            commandName: interaction.commandName, 
+            message: `Live ${symbol} analysis ready!` 
           });
           await interaction.editReply(`✅ **Live ${symbol} analysis ready!**`);
           const cryptoEmbed = createCryptoAnalysisEmbed(realTimeCrypto);
-          logDiscordInteraction('FOLLOW_UP', {
-            commandName: interaction.commandName,
-            message: `${symbol} analysis embed`
+          logDiscordInteraction('FOLLOW_UP', { 
+            commandName: interaction.commandName, 
+            message: `${symbol} analysis embed` 
           });
           await interaction.followUp({ content: '', embeds: [cryptoEmbed] });
         } else {
           throw new Error('No real-time data available');
         }
       } catch (error) {
-        logDiscordInteraction('ERROR', {
-          commandName: interaction.commandName,
-          error
+        logDiscordInteraction('ERROR', { 
+          commandName: interaction.commandName, 
+          error 
         });
-
+        
         await interaction.editReply(`❌ **Sorry, could not fetch ${symbol} data. Please try again later.**`);
       } finally {
         endPerformanceTimer(timerId);
       }
       return;
     }
-
+    
     if (interaction.commandName === 'price') {
       const timerId = startPerformanceTimer('price-command');
       const symbol = interaction.options.getString('symbol')?.toUpperCase();
       if (!symbol) {
-        logDiscordInteraction('EDIT_REPLY', {
-          commandName: interaction.commandName,
-          message: 'Please provide a valid cryptocurrency symbol.'
+        logDiscordInteraction('EDIT_REPLY', { 
+          commandName: interaction.commandName, 
+          message: 'Please provide a valid cryptocurrency symbol.' 
         });
         await interaction.editReply('❌ Please provide a valid cryptocurrency symbol.');
         endPerformanceTimer(timerId);
         return;
       }
-
-      logDiscordInteraction('EDIT_REPLY', {
-        commandName: interaction.commandName,
-        message: `Getting ${symbol} price...`
+      
+      logDiscordInteraction('EDIT_REPLY', { 
+        commandName: interaction.commandName, 
+        message: `Getting ${symbol} price...` 
       });
       await interaction.editReply(`💰 **Getting ${symbol} price...**`);
-
+      
       try {
         const crypto = await getRealTimeCryptoData(symbol);
         if (crypto && crypto.price > 0) {
           const changeEmoji = crypto.change24h > 0 ? '📈' : '📉';
           const changeColor = crypto.change24h > 0 ? '🟢' : '🔴';
-
-          logDiscordInteraction('EDIT_REPLY', {
-            commandName: interaction.commandName,
-            message: `${crypto.name} price: $${crypto.price.toLocaleString()}`
+          
+          logDiscordInteraction('EDIT_REPLY', { 
+            commandName: interaction.commandName, 
+            message: `${crypto.name} price: $${crypto.price.toLocaleString()}` 
           });
           await interaction.editReply(
             `💰 **${crypto.name} (${symbol})**\n` +
@@ -831,9 +831,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
           throw new Error('No price data available');
         }
       } catch (error) {
-        logDiscordInteraction('ERROR', {
-          commandName: interaction.commandName,
-          error
+        logDiscordInteraction('ERROR', { 
+          commandName: interaction.commandName, 
+          error 
         });
         await interaction.editReply(`❌ **Could not fetch ${symbol} price. Please try again later.**`);
       } finally {
@@ -841,58 +841,58 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
       return;
     }
-
+    
     if (interaction.commandName === 'news') {
       const timerId = startPerformanceTimer('news-command');
       try {
         // Show loading message
-        logDiscordInteraction('EDIT_REPLY', {
-          commandName: interaction.commandName,
-          message: 'Fetching latest crypto news...'
+        logDiscordInteraction('EDIT_REPLY', { 
+          commandName: interaction.commandName, 
+          message: 'Fetching latest crypto news...' 
         });
         await interaction.editReply('📰 **Fetching latest crypto news...**');
-
+        
         // Fetch real-time news from CryptoCompare
         log('INFO', 'Slash command: Fetching real-time news from CryptoCompare...');
         const realTimeNews = await fetchCoinDeskNews(5); // Limit to 5 articles for Discord embed
-
+        
         if (realTimeNews.length > 0) {
           log('INFO', `Slash command: Successfully fetched ${realTimeNews.length} real-time news articles`);
-          logDiscordInteraction('EDIT_REPLY', {
-            commandName: interaction.commandName,
-            message: `Found ${realTimeNews.length} latest crypto news articles!`
+          logDiscordInteraction('EDIT_REPLY', { 
+            commandName: interaction.commandName, 
+            message: `Found ${realTimeNews.length} latest crypto news articles!` 
           });
           await interaction.editReply(`✅ **Found ${realTimeNews.length} latest crypto news articles!**`);
           const newsEmbed = createNewsEmbed(realTimeNews);
-          logDiscordInteraction('FOLLOW_UP', {
-            commandName: interaction.commandName,
-            message: 'News embed with real-time articles'
+          logDiscordInteraction('FOLLOW_UP', { 
+            commandName: interaction.commandName, 
+            message: 'News embed with real-time articles' 
           });
           await interaction.followUp({ content: '', embeds: [newsEmbed] });
         } else {
           log('WARN', 'Slash command: CryptoCompare API returned no articles, using fallback');
-          logDiscordInteraction('EDIT_REPLY', {
-            commandName: interaction.commandName,
-            message: 'Using cached news due to API limitations.'
+          logDiscordInteraction('EDIT_REPLY', { 
+            commandName: interaction.commandName, 
+            message: 'Using cached news due to API limitations.' 
           });
           await interaction.editReply('⚠️ **Using cached news due to API limitations.**');
           const newsEmbed = createNewsEmbed();
-          logDiscordInteraction('FOLLOW_UP', {
-            commandName: interaction.commandName,
-            message: 'News embed with cached articles'
+          logDiscordInteraction('FOLLOW_UP', { 
+            commandName: interaction.commandName, 
+            message: 'News embed with cached articles' 
           });
           await interaction.followUp({ content: '', embeds: [newsEmbed] });
         }
       } catch (error) {
-        logDiscordInteraction('ERROR', {
-          commandName: interaction.commandName,
-          error
+        logDiscordInteraction('ERROR', { 
+          commandName: interaction.commandName, 
+          error 
         });
         await interaction.editReply('⚠️ **Using cached news due to API error.**');
         const newsEmbed = createNewsEmbed();
-        logDiscordInteraction('FOLLOW_UP', {
-          commandName: interaction.commandName,
-          message: 'News embed with cached articles (error fallback)'
+        logDiscordInteraction('FOLLOW_UP', { 
+          commandName: interaction.commandName, 
+          message: 'News embed with cached articles (error fallback)' 
         });
         await interaction.followUp({ content: '', embeds: [newsEmbed] });
       } finally {
@@ -900,33 +900,33 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
       return;
     }
-
+    
     if (interaction.commandName === 'test') {
       const timerId = startPerformanceTimer('test-command');
-      logDiscordInteraction('EDIT_REPLY', {
-        commandName: interaction.commandName,
-        message: 'Testing API connections...'
+      logDiscordInteraction('EDIT_REPLY', { 
+        commandName: interaction.commandName, 
+        message: 'Testing API connections...' 
       });
       await interaction.editReply('🧪 **Testing API connections...**');
-
+      
       const isWorking = await testAPIConnection();
       if (isWorking) {
-        logDiscordInteraction('EDIT_REPLY', {
-          commandName: interaction.commandName,
-          message: 'API connections are working! Real-time data is available.'
+        logDiscordInteraction('EDIT_REPLY', { 
+          commandName: interaction.commandName, 
+          message: 'API connections are working! Real-time data is available.' 
         });
         await interaction.editReply('✅ **API connections are working! Real-time data is available.**');
       } else {
-        logDiscordInteraction('EDIT_REPLY', {
-          commandName: interaction.commandName,
-          message: 'API connections failed. Using cached data as fallback.'
+        logDiscordInteraction('EDIT_REPLY', { 
+          commandName: interaction.commandName, 
+          message: 'API connections failed. Using cached data as fallback.' 
         });
         await interaction.editReply('❌ **API connections failed. Using cached data as fallback.**');
       }
       endPerformanceTimer(timerId);
       return;
     }
-
+    
     if (interaction.commandName === 'help') {
       const timerId = startPerformanceTimer('help-command');
       const helpEmbed = new EmbedBuilder()
@@ -945,31 +945,31 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setTimestamp()
         .setFooter({ text: 'CryptoTrader Bot • AI-Powered Trading Analysis' });
 
-      logDiscordInteraction('EDIT_REPLY', {
-        commandName: interaction.commandName,
-        message: 'Help embed'
+      logDiscordInteraction('EDIT_REPLY', { 
+        commandName: interaction.commandName, 
+        message: 'Help embed' 
       });
       await interaction.editReply({ content: '', embeds: [helpEmbed] });
       endPerformanceTimer(timerId);
       return;
     }
-
+    
     if (interaction.commandName === 'derivativetrade') {
       const timerId = startPerformanceTimer('derivativetrade-command');
       const symbol = interaction.options.getString('symbol')?.toUpperCase();
       if (!symbol) {
-        logDiscordInteraction('EDIT_REPLY', {
-          commandName: interaction.commandName,
-          message: 'Please provide a valid derivatives symbol.'
+        logDiscordInteraction('EDIT_REPLY', { 
+          commandName: interaction.commandName, 
+          message: 'Please provide a valid derivatives symbol.' 
         });
         await interaction.editReply('❌ Please provide a valid derivatives symbol.');
         endPerformanceTimer(timerId);
         return;
       }
-
+      
       // Normalize the symbol input
       const normalizedSymbol = symbol.toUpperCase().trim();
-
+      
       // Basic validation for symbol format
       if (!/^[A-Z0-9]{2,10}(USDT|USD|BUSD)?$/i.test(normalizedSymbol)) {
         await interaction.editReply({
@@ -1002,30 +1002,49 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
 
       // Show initial loading message
-      logDiscordInteraction('EDIT_REPLY', {
-        commandName: interaction.commandName,
-        message: `Analyzing ${symbol} multi-timeframe market data...`
+      logDiscordInteraction('EDIT_REPLY', { 
+        commandName: interaction.commandName, 
+        message: `Analyzing ${symbol} multi-timeframe market data...` 
       });
       await interaction.editReply(`🔄 **Analyzing ${symbol} multi-timeframe market data...**\n*Fetching 4h and 1h candlestick data and calculating enhanced technical indicators*`);
-
+      
       try {
         // Fetch comprehensive market data
         log('INFO', `Requesting derivatives trade idea for ${finalSymbol} (original: ${symbol})`);
-
+        
         // Update loading message
-        logDiscordInteraction('EDIT_REPLY', {
-          commandName: interaction.commandName,
-          message: `Generating enhanced AI trade idea for ${symbol}...`
+        logDiscordInteraction('EDIT_REPLY', { 
+          commandName: interaction.commandName, 
+          message: `Generating enhanced AI trade idea for ${symbol}...` 
         });
         log('INFO', `Processing derivatives trade request for ${finalSymbol} (user input: ${symbol})...`);
         log('INFO', `Fetching market data for ${finalSymbol}...`);
         const marketData = await getEnhancedDerivativesMarketData(finalSymbol, 'derivativetrade command');
-
+        
         // Generate trade idea using Gemini
         log('INFO', `Generating AI trade idea for ${finalSymbol}...`);
         const { tradeIdea, modelUsed } = await generateDerivativesTradeIdea(marketData, 'derivativetrade command');
-
-
+        
+        // Check if trade idea generation failed
+        if (!tradeIdea) {
+          logDiscordInteraction('ERROR', {
+            commandName: 'derivativetrade',
+            userId: interaction.user.id,
+            username: interaction.user.username,
+            error: 'Failed to generate trade idea - both primary and fallback APIs failed',
+            crypto: symbol
+          });
+          
+          await interaction.editReply({
+            content: '❌ **Trade Idea Generation Failed**\n\n' +
+                    '• Primary Gemini API: Service unavailable (overloaded)\n' +
+                    '• Fallback OpenRouter API: Also failed\n\n' +
+                    '**Please try again in a few minutes.** The AI models may be experiencing high demand.',
+            embeds: []
+          });
+          return;
+        }
+        
         // Check if we got a quota exceeded error
         if (tradeIdea && tradeIdea.symbol === 'QUOTA_EXCEEDED') {
           const quotaEmbed = new EmbedBuilder()
@@ -1044,29 +1063,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
           await interaction.editReply({ embeds: [quotaEmbed] });
           return;
         }
-
-        if (!tradeIdea) {
-          // Additional check before processing
-          if (interaction.replied || interaction.deferred === false) {
-            log('ERROR', 'Interaction state invalid for promptcheck');
-            return;
-          }
-
-          logDiscordInteraction('EDIT_REPLY', {
-            commandName: interaction.commandName,
-            message: `Unable to generate trade idea for ${finalSymbol}. Please try again later.`
-          });
-          await interaction.editReply(`❌ **Unable to generate trade idea for ${symbol}**\n*AI analysis service may be temporarily unavailable. Please try again in a few minutes.*`);
-          endPerformanceTimer(timerId);
-          return;
-        }
-
+        
         // Store valid trade ideas in Supabase (skip "no trade" recommendations)
         if (tradeIdea.confidence > 0 && tradeIdea.entry > 0) {
           try {
             // Calculate target price based on risk-reward ratio
             const riskAmount = Math.abs(tradeIdea.entry - tradeIdea.stopLoss);
-            const targetPrice = tradeIdea.direction === 'long' ?
+            const targetPrice = tradeIdea.direction === 'long' ? 
               tradeIdea.entry + (riskAmount * tradeIdea.riskReward) :
               tradeIdea.entry - (riskAmount * tradeIdea.riskReward);
             // Final check before editing reply
@@ -1074,7 +1077,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
               log('ERROR', 'Cannot edit reply - interaction not deferred');
               return;
             }
-
+            
             // Map DerivativesTradeIdea to TradingRecommendation format
             const mappedRecommendation: TradingRecommendation = {
               crypto: tradeIdea.symbol,
@@ -1096,12 +1099,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 log('ERROR', 'Failed to send error reply', replyError.message);
               }
             }
-
+            
             // Store in Supabase with entry price
             const currentPrice = marketData.timeframes['1h'].indicators.currentPrice;
-            const stored = await storeTradeRecommendation(mappedRecommendation, tradeIdea.entry, modelUsed); // Pass the actual modelUsed
-
-
+            const stored = await storeTradeRecommendation(mappedRecommendation, tradeIdea.entry, GEMINI_MODEL);
+            
           } catch (storeError) {
             log('ERROR', 'Error storing derivatives trade idea', storeError);
             // Don't fail the command if storage fails, just log the error
@@ -1109,17 +1111,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
         } else {
           log('INFO', `Skipping storage for ${symbol} - no trade recommendation (confidence: ${tradeIdea.confidence}%)`);
         }
-
+        
         // Update with success message
-        logDiscordInteraction('EDIT_REPLY', {
-          commandName: interaction.commandName,
-          message: `Generated enhanced multi-timeframe trade idea for ${symbol}! Confidence: ${tradeIdea.confidence}% • Direction: ${tradeIdea.direction.toUpperCase()}`
+        logDiscordInteraction('EDIT_REPLY', { 
+          commandName: interaction.commandName, 
+          message: `Generated enhanced multi-timeframe trade idea for ${symbol}! Confidence: ${tradeIdea.confidence}% • Direction: ${tradeIdea.direction.toUpperCase()}` 
         });
         await interaction.editReply(`✅ **Generated enhanced multi-timeframe trade idea for ${symbol}!**\n*Confidence: ${tradeIdea.confidence}% • Direction: ${tradeIdea.direction.toUpperCase()}*`);
-
+        
         // Send the trade idea as an embed
         const tradeEmbed = createDerivativesTradeEmbed(tradeIdea, marketData);
-
+        
         // Check if this is a "no trade" recommendation
         if (tradeIdea.confidence === 0 || tradeIdea.entry === 0) {
           // Create a special embed for no trade recommendations
@@ -1128,15 +1130,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
             .setTitle(`⚠️ NO TRADE RECOMMENDED - ${tradeIdea.symbol}`)
             .setDescription('**AI Analysis Complete** • No High-Probability Setup Identified')
             .addFields(
-              {
-                name: '🔍 Analysis Result',
-                value: 'Conflicting signals or insufficient confluence detected',
-                inline: false
+              { 
+                name: '🔍 Analysis Result', 
+                value: 'Conflicting signals or insufficient confluence detected', 
+                inline: false 
               },
-              {
-                name: '🤖 AI Reasoning',
-                value: tradeIdea.technicalReasoning.map(reason => `• ${reason}`).join('\n'),
-                inline: false
+              { 
+                name: '🤖 AI Reasoning', 
+                value: tradeIdea.technicalReasoning.map(reason => `• ${reason}`).join('\n'), 
+                inline: false 
               },
               {
                 name: '💡 Recommendation',
@@ -1146,34 +1148,34 @@ client.on(Events.InteractionCreate, async (interaction) => {
             )
             .setTimestamp()
             .setFooter({ text: 'CryptoTrader Bot • Enhanced Multi-Timeframe Analysis • Capital Preservation Priority' });
-
-          logDiscordInteraction('FOLLOW_UP', {
-            commandName: interaction.commandName,
-            message: `No trade recommendation for ${tradeIdea.symbol}`
+          
+          logDiscordInteraction('FOLLOW_UP', { 
+            commandName: interaction.commandName, 
+            message: `No trade recommendation for ${tradeIdea.symbol}` 
           });
           await interaction.followUp({ embeds: [noTradeEmbed] });
         } else {
-          logDiscordInteraction('FOLLOW_UP', {
-            commandName: interaction.commandName,
-            message: `${tradeIdea.direction.toUpperCase()} trade idea for ${tradeIdea.symbol}`
+          logDiscordInteraction('FOLLOW_UP', { 
+            commandName: interaction.commandName, 
+            message: `${tradeIdea.direction.toUpperCase()} trade idea for ${tradeIdea.symbol}` 
           });
           await interaction.followUp({ embeds: [tradeEmbed] });
         }
-
+        
         endPerformanceTimer(timerId);
       } catch (error: any) {
-        logDiscordInteraction('ERROR', {
-          commandName: interaction.commandName,
-          error
+        logDiscordInteraction('ERROR', { 
+          commandName: interaction.commandName, 
+          error 
         });
-
+        
         log('ERROR', `Error processing derivatives trade request for ${finalSymbol}`, error.message);
-
+        
         // Check if it's a data fetching error (symbol not found)
-        const isDataError = error.message.includes('No data received') ||
-          error.message.includes('Invalid response format') ||
-          error.message.includes('Error fetching candlestick data');
-
+        const isDataError = error.message.includes('No data received') || 
+                           error.message.includes('Invalid response format') ||
+                           error.message.includes('Error fetching candlestick data');
+        
         if (isDataError) {
           await interaction.editReply({
             embeds: [{
@@ -1231,32 +1233,32 @@ client.on(Events.InteractionCreate, async (interaction) => {
             commandName: interaction.commandName,
             message: 'Processing prompt logging request...'
           });
-
+          
           await interaction.deferReply();
         }
-
+        
         log('INFO', '🔍 PROMPT CHECK: Starting prompt logging process...');
-
+        
         // Fetch sample market data for BTCUSDT
         const sampleMarketData = await getEnhancedDerivativesMarketData('BTCUSDT', 'promptcheck-debug');
-
+        
         log('INFO', '🔍 PROMPT CHECK: Market data fetched, generating trade idea to capture prompt and response...');
 
         // Generate the complete prompt for logging
         const completePrompt = buildEnhancedDerivativesTradePrompt(sampleMarketData);
-
+        
         // Log the complete prompt
         console.log('\n' + '='.repeat(80));
         console.log('🔍 PROMPT CHECK: COMPLETE PROMPT SENT TO GEMINI');
         console.log('='.repeat(80));
         console.log(completePrompt);
         console.log('='.repeat(80) + '\n');
-
+        
         // Generate trade idea with special debug context
         const tradeIdea = await generateDerivativesTradeIdea(sampleMarketData, 'promptcheck-debug');
 
         log('INFO', '🔍 PROMPT CHECK: Prompt logging completed successfully');
-
+        
         // Send confirmation to Discord
         if (interaction.deferred || interaction.replied) {
           await interaction.editReply({
@@ -1267,18 +1269,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
             content: '✅ **Prompt logging completed**\n\nCheck the bot console for:\n• Complete FinCoT-TA prompt\n• Gemini raw response\n• Parsed trade analysis'
           });
         }
-
+        
         logDiscordInteraction('EDIT_REPLY', {
           commandName: interaction.commandName,
           message: 'Prompt logging completed. Check bot console for detailed output.'
         });
-
+        
       } catch (error) {
         // Remove from processed set if there was an error so it can be retried
         processedInteractions.delete(interactionKey);
-
+        
         log('ERROR', '🔍 PROMPT CHECK: Error during prompt logging', error.message);
-
+        
         logDiscordInteraction('ERROR', {
           commandName: interaction.commandName,
           error: error.message
@@ -1290,11 +1292,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
       return;
     }
-
+    
   } catch (error) {
-    logDiscordInteraction('ERROR', {
-      commandName: interaction.commandName,
-      error
+    logDiscordInteraction('ERROR', { 
+      commandName: interaction.commandName, 
+      error 
     });
     try {
       if (interaction.deferred) {
@@ -1313,47 +1315,47 @@ async function createMarketOverviewEmbed() {
   try {
     logFunctionEntry('createMarketOverviewEmbed');
     log('INFO', 'Fetching real-time market data for overview...');
-
+    
     const majorCryptos = ['BTC', 'ETH', 'SOL', 'ADA', 'BNB'];
     const cryptoData = await getMultipleCryptoData(majorCryptos);
-
+    
     if (cryptoData.length === 0) {
       throw new Error('No market data available');
     }
-
+    
     // Calculate aggregate metrics
     const totalMarketCap = cryptoData.reduce((sum, crypto) => sum + crypto.marketCap, 0);
     const totalVolume = cryptoData.reduce((sum, crypto) => sum + crypto.volume, 0);
     const avgChange24h = cryptoData.reduce((sum, crypto) => sum + crypto.change24h, 0) / cryptoData.length;
-
+    
     // Determine overall market sentiment based on average change
-    const overallSentiment = avgChange24h > 2 ? 'Bullish 🟢' :
-      avgChange24h < -2 ? 'Bearish 🔴' : 'Neutral 🟡';
-
+    const overallSentiment = avgChange24h > 2 ? 'Bullish 🟢' : 
+                            avgChange24h < -2 ? 'Bearish 🔴' : 'Neutral 🟡';
+    
     const embed = new EmbedBuilder()
       .setColor(avgChange24h > 0 ? 0x00ff00 : avgChange24h < 0 ? 0xff0000 : 0xffff00)
       .setTitle('📊 Live Market Overview')
       .setDescription(`Real-time data from ${cryptoData.length} major cryptocurrencies`)
       .addFields(
-        {
-          name: '📈 Market Sentiment',
-          value: overallSentiment,
-          inline: true
+        { 
+          name: '📈 Market Sentiment', 
+          value: overallSentiment, 
+          inline: true 
         },
-        {
-          name: '📊 Avg 24h Change',
-          value: `${avgChange24h > 0 ? '+' : ''}${avgChange24h.toFixed(2)}%`,
-          inline: true
+        { 
+          name: '📊 Avg 24h Change', 
+          value: `${avgChange24h > 0 ? '+' : ''}${avgChange24h.toFixed(2)}%`, 
+          inline: true 
         },
-        {
-          name: '💰 Total Market Cap',
-          value: `$${(totalMarketCap / 1e12).toFixed(2)}T`,
-          inline: true
+        { 
+          name: '💰 Total Market Cap', 
+          value: `$${(totalMarketCap / 1e12).toFixed(2)}T`, 
+          inline: true 
         },
-        {
-          name: '📈 24h Volume',
-          value: `$${(totalVolume / 1e9).toFixed(1)}B`,
-          inline: true
+        { 
+          name: '📈 24h Volume', 
+          value: `$${(totalVolume / 1e9).toFixed(1)}B`, 
+          inline: true 
         },
         {
           name: '🏆 Top Performers',
@@ -1376,23 +1378,23 @@ async function createMarketOverviewEmbed() {
       )
       .setTimestamp()
       .setFooter({ text: 'CryptoTrader Bot • Live Market Data' });
-
+  
     logFunctionExit('createMarketOverviewEmbed', { cryptoCount: cryptoData.length });
     return embed;
-
+    
   } catch (error) {
     log('ERROR', 'Error creating market overview', error);
-
+    
     // Return error embed
     return new EmbedBuilder()
       .setColor(0xff0000)
       .setTitle('❌ Market Data Unavailable')
       .setDescription('Unable to fetch real-time market data at the moment')
       .addFields(
-        {
-          name: '🔄 Try Again',
-          value: 'Market data services may be temporarily unavailable',
-          inline: false
+        { 
+          name: '🔄 Try Again', 
+          value: 'Market data services may be temporarily unavailable', 
+          inline: false 
         }
       )
       .setTimestamp()
@@ -1403,43 +1405,43 @@ async function createMarketOverviewEmbed() {
 // Helper function to create crypto analysis embed
 function createCryptoAnalysisEmbed(crypto: CryptoData) {
   const isPositive = crypto.change24h > 0;
-  const rsiStatus = crypto.rsi >= 70 ? 'Overbought 🔴' :
-    crypto.rsi <= 30 ? 'Oversold 🟢' : 'Neutral 🟡';
-
+  const rsiStatus = crypto.rsi >= 70 ? 'Overbought 🔴' : 
+                   crypto.rsi <= 30 ? 'Oversold 🟢' : 'Neutral 🟡';
+  
   const embed = new EmbedBuilder()
     .setColor(isPositive ? 0x00ff00 : 0xff0000)
     .setTitle(`${crypto.name} (${crypto.symbol})`)
     .setDescription('Technical Analysis & Market Data')
     .addFields(
-      {
-        name: '💰 Current Price',
-        value: `$${crypto.price.toLocaleString()}`,
-        inline: true
+      { 
+        name: '💰 Current Price', 
+        value: `$${crypto.price.toLocaleString()}`, 
+        inline: true 
       },
-      {
-        name: '📊 24h Change',
-        value: `${crypto.change24h > 0 ? '+' : ''}${crypto.change24h.toFixed(2)}%`,
-        inline: true
+      { 
+        name: '📊 24h Change', 
+        value: `${crypto.change24h > 0 ? '+' : ''}${crypto.change24h.toFixed(2)}%`, 
+        inline: true 
       },
-      {
-        name: '📈 Volume (24h)',
-        value: `$${(crypto.volume / 1e9).toFixed(1)}B`,
-        inline: true
+      { 
+        name: '📈 Volume (24h)', 
+        value: `$${(crypto.volume / 1e9).toFixed(1)}B`, 
+        inline: true 
       },
-      {
-        name: '🎯 RSI (14)',
-        value: `${crypto.rsi.toFixed(1)} - ${rsiStatus}`,
-        inline: true
+      { 
+        name: '🎯 RSI (14)', 
+        value: `${crypto.rsi.toFixed(1)} - ${rsiStatus}`, 
+        inline: true 
       },
-      {
-        name: '📉 MACD',
-        value: `${crypto.macd > 0 ? '+' : ''}${crypto.macd.toFixed(1)}`,
-        inline: true
+      { 
+        name: '📉 MACD', 
+        value: `${crypto.macd > 0 ? '+' : ''}${crypto.macd.toFixed(1)}`, 
+        inline: true 
       },
-      {
-        name: '💎 Market Cap',
-        value: `$${(crypto.marketCap / 1e9).toFixed(1)}B`,
-        inline: true
+      { 
+        name: '💎 Market Cap', 
+        value: `$${(crypto.marketCap / 1e9).toFixed(1)}B`, 
+        inline: true 
       }
     )
     .setTimestamp()
@@ -1450,41 +1452,41 @@ function createCryptoAnalysisEmbed(crypto: CryptoData) {
 
 // Helper function to create trading recommendation embed
 function createRecommendationEmbed(recommendation: TradingRecommendation) {
-  const actionEmoji = recommendation.action === 'buy' ? '🟢' :
-    recommendation.action === 'sell' ? '🔴' : '🟡';
-  const riskEmoji = recommendation.riskLevel === 'low' ? '🟢' :
-    recommendation.riskLevel === 'high' ? '🔴' : '🟡';
-
+  const actionEmoji = recommendation.action === 'buy' ? '🟢' : 
+                     recommendation.action === 'sell' ? '🔴' : '🟡';
+  const riskEmoji = recommendation.riskLevel === 'low' ? '🟢' : 
+                   recommendation.riskLevel === 'high' ? '🔴' : '🟡';
+  
   const embed = new EmbedBuilder()
-    .setColor(recommendation.action === 'buy' ? 0x00ff00 :
-      recommendation.action === 'sell' ? 0xff0000 : 0xffff00)
+    .setColor(recommendation.action === 'buy' ? 0x00ff00 : 
+             recommendation.action === 'sell' ? 0xff0000 : 0xffff00)
     .setTitle(`${actionEmoji} ${recommendation.action.toUpperCase()} ${recommendation.crypto}`)
     .setDescription(`AI Trading Recommendation • ${recommendation.confidence}% Confidence`)
     .addFields(
-      {
-        name: '🎯 Target Price',
-        value: `$${recommendation.targetPrice.toLocaleString()}`,
-        inline: true
+      { 
+        name: '🎯 Target Price', 
+        value: `$${recommendation.targetPrice.toLocaleString()}`, 
+        inline: true 
       },
-      {
-        name: '🛡️ Stop Loss',
-        value: `$${recommendation.stopLoss.toLocaleString()}`,
-        inline: true
+      { 
+        name: '🛡️ Stop Loss', 
+        value: `$${recommendation.stopLoss.toLocaleString()}`, 
+        inline: true 
       },
-      {
-        name: '⏰ Timeframe',
-        value: recommendation.timeframe,
-        inline: true
+      { 
+        name: '⏰ Timeframe', 
+        value: recommendation.timeframe, 
+        inline: true 
       },
-      {
-        name: '⚠️ Risk Level',
-        value: `${riskEmoji} ${recommendation.riskLevel.toUpperCase()}`,
-        inline: true
+      { 
+        name: '⚠️ Risk Level', 
+        value: `${riskEmoji} ${recommendation.riskLevel.toUpperCase()}`, 
+        inline: true 
       },
-      {
-        name: '🤖 AI Analysis',
-        value: recommendation.reasoning.map(reason => `• ${reason}`).join('\n'),
-        inline: false
+      { 
+        name: '🤖 AI Analysis', 
+        value: recommendation.reasoning.map(reason => `• ${reason}`).join('\n'), 
+        inline: false 
       }
     )
     .setTimestamp()
@@ -1503,23 +1505,23 @@ function createNewsEmbed(newsData?: NewsItem[]) {
       .setTimestamp()
       .setFooter({ text: 'CryptoTrader Bot • News Service' });
   }
-
+  
   const newsToDisplay = newsData;
   const isRealTime = !!newsData;
-
+  
   const embed = new EmbedBuilder()
     .setColor(0x3b82f6)
     .setTitle(`📰 ${isRealTime ? 'Live' : 'Cached'} Crypto News & Sentiment`)
     .setDescription(`${isRealTime ? 'Real-time' : 'Recent'} market-moving news with sentiment analysis`)
     .setTimestamp()
     .setFooter({ text: `CryptoTrader Bot • ${isRealTime ? 'Live' : 'Cached'} News Analysis` });
-
+  
   newsToDisplay.forEach((news: NewsItem, index: number) => {
-    const sentimentEmoji = news.sentiment === 'bullish' ? '🟢' :
-      news.sentiment === 'bearish' ? '🔴' : '🟡';
-    const impactEmoji = news.impact === 'high' ? '🔥' :
-      news.impact === 'medium' ? '⚡' : '💫';
-
+    const sentimentEmoji = news.sentiment === 'bullish' ? '🟢' : 
+                          news.sentiment === 'bearish' ? '🔴' : '🟡';
+    const impactEmoji = news.impact === 'high' ? '🔥' : 
+                       news.impact === 'medium' ? '⚡' : '💫';
+    
     embed.addFields({
       name: `${sentimentEmoji} ${news.title}`,
       value: `${impactEmoji} ${news.impact.toUpperCase()} impact • ${news.source} • ${news.timestamp}`,
@@ -1546,19 +1548,19 @@ function createDerivativesTradeEmbed(tradeIdea: DerivativesTradeIdea, marketData
         { name: '🎲 Confidence', value: `${tradeIdea.confidence}%`, inline: true },
         { name: '⏰ Timeframe', value: tradeIdea.timeframe, inline: true }
       );
-
+    
     // Add truncated reasoning for no trade
     const reasoningText = tradeIdea.technicalReasoning
       .map(reason => `• ${reason}`)
       .join('\n');
-
+    
     // Truncate to fit Discord's 1024 character limit
-    const truncatedReasoning = reasoningText.length > 1000
-      ? reasoningText.substring(0, 1000) + '...'
+    const truncatedReasoning = reasoningText.length > 1000 
+      ? reasoningText.substring(0, 1000) + '...' 
       : reasoningText;
-
+    
     embed.addFields({ name: '🔍 Analysis Summary', value: truncatedReasoning });
-
+    
   } else {
     // Add trade details for valid trades
     embed.addFields(
@@ -1575,12 +1577,12 @@ function createDerivativesTradeEmbed(tradeIdea: DerivativesTradeIdea, marketData
     const reasoningText = tradeIdea.technicalReasoning
       .map(reason => `• ${reason}`)
       .join('\n');
-
+    
     // Truncate to fit Discord's 1024 character limit
-    const truncatedReasoning = reasoningText.length > 1000
-      ? reasoningText.substring(0, 1000) + '...'
+    const truncatedReasoning = reasoningText.length > 1000 
+      ? reasoningText.substring(0, 1000) + '...' 
       : reasoningText;
-
+    
     embed.addFields({ name: '🔍 Technical Analysis', value: truncatedReasoning });
   }
 
@@ -1619,13 +1621,13 @@ client.on(Events.MessageCreate, async (message) => {
     const cryptoMatch = content.match(/!(btc|eth|sol|ada)/) as RegExpMatchArray | null;
     if (cryptoMatch) {
       const symbol = cryptoMatch[1].toUpperCase();
-
+      
       // Try to get real-time data first
       const loadingMsg = await message.channel.send(`🔄 **Fetching live ${symbol} data...**`);
-
+      
       try {
         const realTimeCrypto = await getRealTimeCryptoData(symbol);
-
+        
         if (realTimeCrypto && realTimeCrypto.price > 0) {
           await loadingMsg.edit(`✅ **Live ${symbol} analysis ready!**`);
           const cryptoEmbed = createCryptoAnalysisEmbed(realTimeCrypto);
@@ -1635,7 +1637,7 @@ client.on(Events.MessageCreate, async (message) => {
         }
       } catch (error) {
         console.error(`Error fetching real-time data for ${symbol}:`, error);
-
+        
         await loadingMsg.edit(`❌ **Sorry, could not fetch ${symbol} data. Please try again later.**`);
       }
       return;
@@ -1644,7 +1646,7 @@ client.on(Events.MessageCreate, async (message) => {
     // Real-time test command (for debugging)
     if (content.includes('!test') || content.includes('!apitest')) {
       const testMsg = await message.channel.send('🧪 **Testing API connections...**');
-
+      
       const isWorking = await testAPIConnection();
       if (isWorking) {
         await testMsg.edit('✅ **API connections are working! Real-time data is available.**');
